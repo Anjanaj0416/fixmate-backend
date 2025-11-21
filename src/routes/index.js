@@ -1,7 +1,12 @@
 const express = require('express');
 const router = express.Router();
 
-// Import all route modules
+/**
+ * Main API Router
+ * Combines all route modules
+ */
+
+// Import route modules
 const authRoutes = require('./authRoutes');
 const userRoutes = require('./userRoutes');
 const workerRoutes = require('./workerRoutes');
@@ -13,27 +18,34 @@ const paymentRoutes = require('./paymentRoutes');
 const adminRoutes = require('./adminRoutes');
 const aiRoutes = require('./aiRoutes');
 
-// Health check endpoint
-router.get('/health', (req, res) => {
-  res.status(200).json({
+/**
+ * API Welcome Route
+ */
+router.get('/', (req, res) => {
+  res.json({
     success: true,
-    message: 'FixMate API is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
-
-// API version endpoint
-router.get('/version', (req, res) => {
-  res.status(200).json({
-    success: true,
+    message: 'Welcome to FixMate API v1',
     version: '1.0.0',
-    apiVersion: 'v1',
-    description: 'FixMate - Skilled Worker Booking Platform API'
+    endpoints: {
+      auth: '/api/v1/auth',
+      users: '/api/v1/users',
+      workers: '/api/v1/workers',
+      bookings: '/api/v1/bookings',
+      reviews: '/api/v1/reviews',
+      chat: '/api/v1/chat',
+      notifications: '/api/v1/notifications',
+      payments: '/api/v1/payments',
+      admin: '/api/v1/admin',
+      ai: '/api/v1/ai'
+    },
+    documentation: '/api/v1/docs',
+    status: 'active'
   });
 });
 
-// Mount route modules
+/**
+ * Mount all routes
+ */
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/workers', workerRoutes);
@@ -45,13 +57,28 @@ router.use('/payments', paymentRoutes);
 router.use('/admin', adminRoutes);
 router.use('/ai', aiRoutes);
 
-// 404 handler for undefined routes
-router.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'API endpoint not found',
-    path: req.originalUrl,
-    method: req.method
+/**
+ * API Documentation Route (placeholder)
+ */
+router.get('/docs', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API Documentation',
+    info: 'Complete API documentation coming soon',
+    swagger: '/api/v1/swagger',
+    postman: 'Import Postman collection for full documentation'
+  });
+});
+
+/**
+ * Health Check Route
+ */
+router.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
   });
 });
 
