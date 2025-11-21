@@ -1,10 +1,10 @@
 require('dotenv').config();
 
 const app = require('./app');
-const { connectDB } = require('./config/database');
-const { initializeFirebase } = require('./config/firebase-admin');
-const { initializeCloudinary } = require('./config/cloudinary');
-const logger = require('./utils/logger');
+const { connectDB } = require('./src/config/database');
+const { initializeFirebase } = require('./src/config/firebase-admin');
+const { initializeCloudinary } = require('./src/config/cloudinary');
+const logger = require('./src/utils/logger');
 
 /**
  * FixMate Backend Server
@@ -88,7 +88,7 @@ const startServer = () => {
       
       try {
         // Close database connection
-        const { disconnectDB } = require('./config/database');
+        const { disconnectDB } = require('./src/config/database');
         await disconnectDB();
         logger.info('Database connections closed');
         

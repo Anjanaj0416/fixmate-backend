@@ -6,14 +6,14 @@ const compression = require('compression');
 const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
 
-const logger = require('./utils/logger');
-const { RATE_LIMITS } = require('./config/constants');
+const logger = require('./src/utils/logger');
+const { RATE_LIMITS } = require('./src/config/constants');
 
 // Import routes
-const routes = require('./routes');
+const routes = require('./src/routes');
 
 // Import middleware
-const errorHandler = require('./middleware/errorHandler');
+const errorHandler = require('./src/middleware/errorHandler');
 
 /**
  * Express Application Setup
