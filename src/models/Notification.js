@@ -153,7 +153,7 @@ const notificationSchema = new mongoose.Schema({
 notificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
 notificationSchema.index({ type: 1, createdAt: -1 });
 notificationSchema.index({ relatedBooking: 1 });
-notificationSchema.index({ expiresAt: 1 });
+// NOTE: TTL index below creates an index on expiresAt, no need for separate index
 
 // Methods
 notificationSchema.methods.markAsRead = async function() {

@@ -6,8 +6,8 @@ const reviewSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking',
     required: true,
-    unique: true, // One review per booking
-    index: true
+    unique: true // One review per booking - This creates an index automatically
+    // NOTE: Removed index: true to avoid duplicate
   },
   
   customerId: {
@@ -90,8 +90,7 @@ const reviewSchema = new mongoose.Schema({
   moderationStatus: {
     type: String,
     enum: ['pending', 'approved', 'rejected', 'flagged'],
-    default: 'approved',
-    index: true
+    default: 'approved'
   },
   
   moderationReason: String,

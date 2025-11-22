@@ -128,8 +128,7 @@ const categorySchema = new mongoose.Schema({
   // Status
   isActive: {
     type: Boolean,
-    default: true,
-    index: true
+    default: true
   },
   
   isFeatured: {
@@ -166,7 +165,7 @@ const categorySchema = new mongoose.Schema({
 });
 
 // Indexes
-categorySchema.index({ slug: 1 });
+// NOTE: slug already has unique: true which creates an index, so no need for additional index
 categorySchema.index({ isActive: 1, displayOrder: 1 });
 categorySchema.index({ parentCategory: 1 });
 categorySchema.index({ 'stats.popularityScore': -1 });

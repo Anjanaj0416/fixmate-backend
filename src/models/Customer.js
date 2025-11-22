@@ -6,15 +6,13 @@ const customerSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   
   firebaseUid: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   
   // Customer Preferences
@@ -135,8 +133,7 @@ const customerSchema = new mongoose.Schema({
 });
 
 // Indexes
-customerSchema.index({ userId: 1 });
-customerSchema.index({ firebaseUid: 1 });
+// NOTE: userId and firebaseUid already have unique: true which creates indexes
 customerSchema.index({ 'savedAddresses.coordinates': '2dsphere' });
 
 // Methods

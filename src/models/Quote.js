@@ -5,22 +5,22 @@ const quoteSchema = new mongoose.Schema({
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking',
-    required: true,
-    index: true
+    required: true
+    // NOTE: Removed index: true - there's a schema.index below
   },
   
   customerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
+    // NOTE: Removed index: true - it's included in compound index below
   },
   
   workerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
+    // NOTE: Removed index: true - it's included in compound index below
   },
   
   // Quote Details
@@ -188,6 +188,7 @@ const quoteSchema = new mongoose.Schema({
 });
 
 // Indexes
+// NOTE: These compound indexes also index the first field (workerId, customerId)
 quoteSchema.index({ workerId: 1, status: 1, createdAt: -1 });
 quoteSchema.index({ customerId: 1, status: 1, createdAt: -1 });
 quoteSchema.index({ bookingId: 1 });

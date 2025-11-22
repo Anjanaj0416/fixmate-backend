@@ -112,8 +112,8 @@ const userSchema = new mongoose.Schema({
 });
 
 // Indexes
+// NOTE: email and firebaseUid already have unique: true which creates indexes
 userSchema.index({ 'location.coordinates': '2dsphere' });
-userSchema.index({ email: 1 });
 userSchema.index({ role: 1 });
 userSchema.index({ accountStatus: 1 });
 

@@ -6,15 +6,13 @@ const workerSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   
   firebaseUid: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   
   // Professional Information
@@ -189,8 +187,7 @@ const workerSchema = new mongoose.Schema({
 });
 
 // Indexes
-workerSchema.index({ userId: 1 });
-workerSchema.index({ firebaseUid: 1 });
+// NOTE: userId and firebaseUid already have unique: true which creates indexes
 workerSchema.index({ specializations: 1 });
 workerSchema.index({ 'rating.average': -1 });
 workerSchema.index({ availability: 1 });

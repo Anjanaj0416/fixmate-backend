@@ -5,16 +5,14 @@ const problemImageSchema = new mongoose.Schema({
   customerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
   },
   
   // Booking Reference (if image is part of a booking)
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking',
-    default: null,
-    index: true
+    default: null
   },
   
   // Image Data
@@ -49,8 +47,7 @@ const problemImageSchema = new mongoose.Schema({
     status: {
       type: String,
       enum: ['pending', 'processing', 'completed', 'failed'],
-      default: 'pending',
-      index: true
+      default: 'pending'
     },
     
     processedAt: Date,
@@ -208,8 +205,7 @@ const problemImageSchema = new mongoose.Schema({
   // Timestamps
   uploadedAt: {
     type: Date,
-    default: Date.now,
-    index: true
+    default: Date.now
   },
   
   createdAt: {
@@ -230,7 +226,7 @@ problemImageSchema.index({ customerId: 1, uploadedAt: -1 });
 problemImageSchema.index({ bookingId: 1 });
 problemImageSchema.index({ 'aiAnalysis.status': 1 });
 problemImageSchema.index({ 'aiAnalysis.suggestedService': 1 });
-problemImageSchema.index({ expiresAt: 1 });
+// NOTE: TTL index below creates an index on expiresAt
 
 // Methods
 problemImageSchema.methods.updateAIAnalysis = async function(analysisResult) {

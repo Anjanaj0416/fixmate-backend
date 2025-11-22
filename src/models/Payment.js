@@ -5,23 +5,23 @@ const paymentSchema = new mongoose.Schema({
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking',
-    required: true,
-    index: true
+    required: true
+    // NOTE: Removed index: true - it's included in compound indexes below
   },
   
   // Parties
   customerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
+    // NOTE: Removed index: true - it's included in compound index below
   },
   
   workerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
+    // NOTE: Removed index: true - it's included in compound index below
   },
   
   // Payment Amount
@@ -71,16 +71,14 @@ const paymentSchema = new mongoose.Schema({
       'refunded',
       'partially-refunded'
     ],
-    default: 'pending',
-    index: true
+    default: 'pending'
   },
   
   // Transaction Details
   transactionId: {
     type: String,
     unique: true,
-    sparse: true,
-    index: true
+    sparse: true
   },
   
   externalTransactionId: {
@@ -213,9 +211,10 @@ const paymentSchema = new mongoose.Schema({
 });
 
 // Indexes
+// NOTE: These compound indexes also index the first field (customerId, workerId)
 paymentSchema.index({ customerId: 1, status: 1, createdAt: -1 });
 paymentSchema.index({ workerId: 1, status: 1, createdAt: -1 });
-paymentSchema.index({ transactionId: 1 });
+// NOTE: transactionId already has unique: true which creates an index
 paymentSchema.index({ 'workerPayoutDetails.payoutStatus': 1 });
 
 // Generate unique transaction ID
