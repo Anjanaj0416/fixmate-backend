@@ -28,8 +28,8 @@ const messageSchema = new mongoose.Schema({
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking',
-    default: null,
-    index: true
+    default: null
+    // NOTE: Removed index: true - there's a schema.index below
   },
   
   // Message Content

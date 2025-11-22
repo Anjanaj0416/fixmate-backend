@@ -7,21 +7,21 @@ const reviewSchema = new mongoose.Schema({
     ref: 'Booking',
     required: true,
     unique: true // One review per booking - This creates an index automatically
-    // NOTE: Removed index: true to avoid duplicate
+    // NOTE: unique: true already creates an index, no need for separate index
   },
   
   customerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
+    // NOTE: Removed index: true - there's a schema.index below
   },
   
   workerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
+    // NOTE: Removed index: true - it's included in compound index below
   },
   
   // Rating (1-5 stars)

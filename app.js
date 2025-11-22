@@ -12,8 +12,8 @@ const { RATE_LIMITS } = require('./src/config/constants');
 // Import routes
 const routes = require('./src/routes');
 
-// Import middleware
-const errorHandler = require('./src/middleware/errorHandler');
+// Import middleware - FIX: Import the errorHandler function from the object
+const { errorHandler } = require('./src/middleware/errorHandler');
 
 /**
  * Express Application Setup
@@ -145,7 +145,7 @@ app.use((req, res, next) => {
   });
 });
 
-// Global Error Handler
+// Global Error Handler - FIX: Now using the correct errorHandler function
 app.use(errorHandler);
 
 // ==========================================

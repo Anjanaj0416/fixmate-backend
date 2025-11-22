@@ -5,15 +5,15 @@ const bookingSchema = new mongoose.Schema({
   customerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
+    // NOTE: Removed index: true - it's included in compound index below
   },
   
   workerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
-    index: true
+    required: true
+    // NOTE: Removed index: true - it's included in compound index below
   },
   
   // Service Details
