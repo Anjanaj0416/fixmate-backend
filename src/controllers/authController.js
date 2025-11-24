@@ -2,98 +2,201 @@ const admin = require('../config/firebase-admin');
 const { User, Worker, Customer } = require('../models');
 
 /**
- * @desc    Register a new user
- * @route   POST /api/auth/register
- * @access  Public
+ * @desc    Register a new user (Signup)
+ * @route   POST /api/v1/auth/signup
+ * @access  Public (but requires Firebase token)
  */
-exports.register = async (req, res, next) => {
+exports.signup = async (req, res, next) => {
   try {
-    const { firebaseUid, email, phoneNumber, fullName, role } = req.body;
+    console.log('📥 Signup request received');
+    console.log('Headers:', {
+      authorization: req.headers.authorization ? 'Present' : 'Missing',
+      contentType: req.headers['content-type']
+    });
+    console.log('Body:', req.body);
 
-    // Verify Firebase token
-    const decodedToken = await admin.auth().verifyIdToken(req.headers.authorization?.split('Bearer ')[1]);
+    const { firebaseUid, email, fullName, phoneNumber, address, role } = req.body;
+
+    // Validate required fields
+    if (!firebaseUid || !email || !fullName || !role) {
+      console.log('❌ Missing required fields');
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: firebaseUid, email, fullName, and role are required'
+      });
+    }
+
+    // Verify Firebase token from Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ Missing or invalid authorization header');
+      return res.status(401).json({
+        success: false,
+        message: 'Authorization token required'
+      });
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    console.log('🔐 Verifying Firebase token...');
+
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(token);
+      console.log('✅ Token verified for user:', decodedToken.uid);
+    } catch (tokenError) {
+      console.error('❌ Token verification failed:', tokenError);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
     
+    // Verify the firebaseUid matches the token
     if (decodedToken.uid !== firebaseUid) {
+      console.log('❌ Token UID mismatch');
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: 'Unauthorized - Token does not match user'
       });
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ firebaseUid });
+    console.log('🔍 Checking if user exists...');
+    const existingUser = await User.findOne({ 
+      $or: [{ firebaseUid }, { email }] 
+    });
+    
     if (existingUser) {
+      console.log('❌ User already exists:', existingUser.email);
       return res.status(400).json({
         success: false,
-        message: 'User already exists'
+        message: 'User already exists with this email or Firebase account'
       });
     }
 
-    // Create user
+    console.log('📝 Creating new user in MongoDB...');
+
+    // Create user in MongoDB
     const user = await User.create({
       firebaseUid,
       email,
-      phoneNumber,
       fullName,
+      phoneNumber: phoneNumber || '',
+      address: address || '',
       role: role || 'customer',
-      isEmailVerified: decodedToken.email_verified || false
+      isEmailVerified: decodedToken.email_verified || false,
+      accountStatus: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
+
+    console.log('✅ User created in MongoDB:', user._id);
 
     // Create role-specific profile
     if (role === 'worker') {
+      console.log('👷 Creating worker profile...');
       await Worker.create({
         userId: user._id,
         firebaseUid: user.firebaseUid,
+        isProfileComplete: false,
         specializations: [],
         experience: 0,
-        hourlyRate: 0
+        hourlyRate: 0,
+        serviceAreas: [],
+        availability: {
+          monday: { available: false, slots: [] },
+          tuesday: { available: false, slots: [] },
+          wednesday: { available: false, slots: [] },
+          thursday: { available: false, slots: [] },
+          friday: { available: false, slots: [] },
+          saturday: { available: false, slots: [] },
+          sunday: { available: false, slots: [] }
+        },
+        createdAt: new Date()
       });
-    } else if (role === 'customer') {
+      console.log('✅ Worker profile created');
+    } else {
+      console.log('👤 Creating customer profile...');
       await Customer.create({
         userId: user._id,
-        firebaseUid: user.firebaseUid
+        firebaseUid: user.firebaseUid,
+        addresses: address ? [{ address, isDefault: true }] : [],
+        createdAt: new Date()
       });
+      console.log('✅ Customer profile created');
     }
 
+    console.log('🎉 Registration complete!');
+
+    // Return success with user data
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
       data: {
         user: {
           id: user._id,
+          firebaseUid: user.firebaseUid,
           email: user.email,
           fullName: user.fullName,
-          role: user.role
+          phoneNumber: user.phoneNumber,
+          address: user.address,
+          role: user.role,
+          accountStatus: user.accountStatus,
+          isEmailVerified: user.isEmailVerified,
+          createdAt: user.createdAt
         }
       }
     });
+    
   } catch (error) {
+    console.error('❌ Signup error:', error);
+    
+    // Check for MongoDB duplicate key error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'User already exists with this email'
+      });
+    }
+    
     next(error);
   }
 };
 
 /**
  * @desc    Login user
- * @route   POST /api/auth/login
+ * @route   POST /api/v1/auth/login
  * @access  Public
  */
 exports.login = async (req, res, next) => {
   try {
-    const { firebaseUid } = req.body;
+    console.log('📥 Login request received');
+    
+    const { email } = req.body;
 
     // Verify Firebase token
-    const token = req.headers.authorization?.split('Bearer ')[1];
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    
-    if (decodedToken.uid !== firebaseUid) {
-      return res.status(403).json({
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
         success: false,
-        message: 'Unauthorized'
+        message: 'Authorization token required'
       });
     }
 
-    // Find user
-    const user = await User.findOne({ firebaseUid });
+    const token = authHeader.split('Bearer ')[1];
+    let decodedToken;
+    
+    try {
+      decodedToken = await admin.auth().verifyIdToken(token);
+    } catch (tokenError) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
+    // Find user by Firebase UID (more reliable than email)
+    const user = await User.findOne({ firebaseUid: decodedToken.uid });
     
     if (!user) {
       return res.status(404).json({
@@ -122,6 +225,8 @@ exports.login = async (req, res, next) => {
       profile = await Customer.findOne({ userId: user._id });
     }
 
+    console.log('✅ Login successful for:', user.email);
+
     res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -130,183 +235,126 @@ exports.login = async (req, res, next) => {
           id: user._id,
           firebaseUid: user.firebaseUid,
           email: user.email,
-          phoneNumber: user.phoneNumber,
           fullName: user.fullName,
+          phoneNumber: user.phoneNumber,
           role: user.role,
+          accountStatus: user.accountStatus,
+          isEmailVerified: user.isEmailVerified,
           profileImage: user.profileImage,
-          accountStatus: user.accountStatus
-        },
-        profile
+          profile: profile
+        }
       }
     });
   } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * @desc    Logout user
- * @route   POST /api/auth/logout
- * @access  Private
- */
-exports.logout = async (req, res, next) => {
-  try {
-    const { firebaseUid } = req.user;
-
-    // Clear FCM token
-    await User.findOneAndUpdate(
-      { firebaseUid },
-      { fcmToken: null }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Logout successful'
-    });
-  } catch (error) {
+    console.error('❌ Login error:', error);
     next(error);
   }
 };
 
 /**
  * @desc    Verify Firebase token
- * @route   POST /api/auth/verify-token
- * @access  Public
+ * @route   POST /api/v1/auth/verify-token
+ * @access  Private
  */
 exports.verifyToken = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split('Bearer ')[1];
-
-    if (!token) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
-        message: 'No token provided'
+        message: 'Authorization token required'
       });
     }
 
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    const token = authHeader.split('Bearer ')[1];
+    
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(token);
+    } catch (tokenError) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
+    // Find user
+    const user = await User.findOne({ firebaseUid: decodedToken.uid });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Get role-specific profile
+    let profile = null;
+    if (user.role === 'worker') {
+      profile = await Worker.findOne({ userId: user._id });
+    } else if (user.role === 'customer') {
+      profile = await Customer.findOne({ userId: user._id });
+    }
 
     res.status(200).json({
       success: true,
-      data: {
-        uid: decodedToken.uid,
-        email: decodedToken.email,
-        email_verified: decodedToken.email_verified
+      user: {
+        id: user._id,
+        firebaseUid: user.firebaseUid,
+        email: user.email,
+        fullName: user.fullName,
+        phoneNumber: user.phoneNumber,
+        role: user.role,
+        accountStatus: user.accountStatus,
+        isEmailVerified: user.isEmailVerified,
+        profileImage: user.profileImage,
+        profile: profile
       }
     });
   } catch (error) {
-    res.status(401).json({
-      success: false,
-      message: 'Invalid token'
-    });
-  }
-};
-
-/**
- * @desc    Update FCM token
- * @route   PUT /api/auth/fcm-token
- * @access  Private
- */
-exports.updateFCMToken = async (req, res, next) => {
-  try {
-    const { firebaseUid } = req.user;
-    const { fcmToken } = req.body;
-
-    const user = await User.findOneAndUpdate(
-      { firebaseUid },
-      { fcmToken },
-      { new: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'FCM token updated successfully',
-      data: { fcmToken: user.fcmToken }
-    });
-  } catch (error) {
+    console.error('❌ Token verification error:', error);
     next(error);
   }
 };
 
 /**
- * @desc    Request password reset
- * @route   POST /api/auth/forgot-password
- * @access  Public
+ * @desc    Refresh session
+ * @route   POST /api/v1/auth/refresh
+ * @access  Private
  */
-exports.forgotPassword = async (req, res, next) => {
+exports.refreshSession = async (req, res, next) => {
   try {
-    const { email } = req.body;
+    // Same as verifyToken for now
+    return exports.verifyToken(req, res, next);
+  } catch (error) {
+    console.error('❌ Session refresh error:', error);
+    next(error);
+  }
+};
 
-    // Firebase handles password reset emails
-    // This is just for logging/tracking
-    const user = await User.findOne({ email });
-    
-    if (!user) {
-      // Don't reveal if user exists
-      return res.status(200).json({
-        success: true,
-        message: 'If an account exists with this email, a password reset link will be sent.'
+/**
+ * @desc    Logout user
+ * @route   POST /api/v1/auth/logout
+ * @access  Private
+ */
+exports.logout = async (req, res, next) => {
+  try {
+    // Clear FCM token if provided
+    const { fcmToken } = req.body;
+    if (fcmToken && req.user) {
+      await User.findByIdAndUpdate(req.user.id, {
+        $pull: { fcmTokens: fcmToken }
       });
     }
 
     res.status(200).json({
       success: true,
-      message: 'Password reset email sent successfully'
+      message: 'Logged out successfully'
     });
   } catch (error) {
+    console.error('❌ Logout error:', error);
     next(error);
   }
 };
 
-/**
- * @desc    Verify phone number (OTP verification)
- * @route   POST /api/auth/verify-phone
- * @access  Private
- */
-exports.verifyPhone = async (req, res, next) => {
-  try {
-    const { firebaseUid } = req.user;
-    const { isVerified } = req.body;
-
-    const user = await User.findOneAndUpdate(
-      { firebaseUid },
-      { isPhoneVerified: isVerified },
-      { new: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Phone verification status updated',
-      data: { isPhoneVerified: user.isPhoneVerified }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * @desc    Delete user account
- * @route   DELETE /api/auth/delete-account
- * @access  Private
- */
-exports.deleteAccount = async (req, res, next) => {
-  try {
-    const { firebaseUid } = req.user;
-
-    // Soft delete - mark account as deleted
-    await User.findOneAndUpdate(
-      { firebaseUid },
-      { accountStatus: 'deleted' }
-    );
-
-    // Delete from Firebase Auth
-    await admin.auth().deleteUser(firebaseUid);
-
-    res.status(200).json({
-      success: true,
-      message: 'Account deleted successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+module.exports = exports;
