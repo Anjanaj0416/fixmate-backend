@@ -169,3 +169,29 @@
 {"level":"warn","message":"Mongoose disconnected from MongoDB","service":"fixmate-api","timestamp":"2025-11-24 13:57:07"}
 {"level":"info","message":"Mongoose default connection is open","service":"fixmate-api","timestamp":"2025-11-24 13:57:12"}
 {"level":"info","message":"Mongoose connected to MongoDB","service":"fixmate-api","timestamp":"2025-11-24 13:57:12"}
+{"level":"info","message":"Starting FixMate Backend Server...","service":"fixmate-api","timestamp":"2025-11-24 21:22:56"}
+{"level":"info","message":"Environment: development","service":"fixmate-api","timestamp":"2025-11-24 21:22:56"}
+{"level":"info","message":"Connecting to MongoDB...","service":"fixmate-api","timestamp":"2025-11-24 21:22:56"}
+{"level":"info","message":"Mongoose default connection is open","service":"fixmate-api","timestamp":"2025-11-24 21:23:01"}
+{"level":"info","message":"MongoDB Connected: ac-xisigml-shard-00-01.5aysnp1.mongodb.net","service":"fixmate-api","timestamp":"2025-11-24 21:23:01"}
+{"level":"info","message":"Database Name: test","service":"fixmate-api","timestamp":"2025-11-24 21:23:01"}
+{"level":"info","message":"✓ MongoDB connected successfully","service":"fixmate-api","timestamp":"2025-11-24 21:23:01"}
+{"level":"info","message":"Initializing Firebase Admin SDK...","service":"fixmate-api","timestamp":"2025-11-24 21:23:01"}
+{"level":"info","message":"Firebase Admin SDK initialized successfully","service":"fixmate-api","timestamp":"2025-11-24 21:23:04"}
+{"level":"info","message":"Project ID: fixamte-df879","service":"fixmate-api","timestamp":"2025-11-24 21:23:04"}
+{"level":"info","message":"✓ Firebase Admin SDK initialized successfully","service":"fixmate-api","timestamp":"2025-11-24 21:23:04"}
+{"level":"info","message":"Checking Cloudinary configuration...","service":"fixmate-api","timestamp":"2025-11-24 21:23:04"}
+{"level":"info","message":"Cloudinary initialized successfully","service":"fixmate-api","timestamp":"2025-11-24 21:23:04"}
+{"level":"info","message":"Cloud Name: your_cloud_name","service":"fixmate-api","timestamp":"2025-11-24 21:23:04"}
+{"level":"info","message":"✓ Cloudinary initialized successfully","service":"fixmate-api","timestamp":"2025-11-24 21:23:04"}
+{"level":"info","message":"All services initialized successfully","service":"fixmate-api","timestamp":"2025-11-24 21:23:04"}
+{"level":"info","message":"==================================================","service":"fixmate-api","timestamp":"2025-11-24 21:23:05"}
+{"level":"info","message":"🚀 FixMate Server running in development mode","service":"fixmate-api","timestamp":"2025-11-24 21:23:05"}
+{"level":"info","message":"📡 Server listening on port 5001","service":"fixmate-api","timestamp":"2025-11-24 21:23:05"}
+{"level":"info","message":"🌐 API URL: http://localhost:5001/api/v1","service":"fixmate-api","timestamp":"2025-11-24 21:23:05"}
+{"level":"info","message":"💚 Health check: http://localhost:5001/health","service":"fixmate-api","timestamp":"2025-11-24 21:23:05"}
+{"level":"info","message":"==================================================","service":"fixmate-api","timestamp":"2025-11-24 21:23:05"}
+{"level":"info","message":"Mongoose default connection is disconnected","service":"fixmate-api","timestamp":"2025-11-24 21:30:26"}
+{"level":"warn","message":"Mongoose disconnected from MongoDB","service":"fixmate-api","timestamp":"2025-11-24 21:30:26"}
+{"level":"info","message":"Mongoose default connection is open","service":"fixmate-api","timestamp":"2025-11-24 21:30:33"}
+{"level":"info","message":"Mongoose connected to MongoDB","service":"fixmate-api","timestamp":"2025-11-24 21:30:33"}
