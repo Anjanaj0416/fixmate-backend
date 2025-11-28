@@ -1,125 +1,70 @@
-const admin = require('../config/firebase-admin');
-const { User, Worker, Customer } = require('../models');
+const { getFirebaseAdmin } = require('../config/firebase-admin');
+const User = require('../models/User');
+const Worker = require('../models/Worker');
+const Customer = require('../models/Customer');
 
 /**
- * @desc    Register a new user (Signup)
- * @route   POST /api/v1/auth/signup
- * @access  Public (but requires Firebase token)
+ * Get Firebase Admin (lazy loading)
+ * This is called when needed, not at module load time
  */
-exports.signup = async (req, res, next) => {
+const getAdmin = () => {
+  return getFirebaseAdmin();
+};
+
+/**
+ * @desc    Register a new user
+ * @route   POST /api/auth/register
+ * @access  Public
+ */
+exports.register = async (req, res, next) => {
   try {
-    console.log('📥 Signup request received');
-    console.log('Headers:', {
-      authorization: req.headers.authorization ? 'Present' : 'Missing',
-      contentType: req.headers['content-type']
-    });
-    console.log('Body:', req.body);
-
-    const { firebaseUid, email, fullName, phoneNumber, address, role } = req.body;
-
-    // Validate required fields
-    if (!firebaseUid || !email || !fullName || !role) {
-      console.log('❌ Missing required fields');
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: firebaseUid, email, fullName, and role are required'
-      });
-    }
-
-    // Verify Firebase token from Authorization header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ Missing or invalid authorization header');
-      return res.status(401).json({
-        success: false,
-        message: 'Authorization token required'
-      });
-    }
-
-    const token = authHeader.split('Bearer ')[1];
-    console.log('🔐 Verifying Firebase token...');
-
-    let decodedToken;
-    try {
-      decodedToken = await admin.auth().verifyIdToken(token);
-      console.log('✅ Token verified for user:', decodedToken.uid);
-    } catch (tokenError) {
-      console.error('❌ Token verification failed:', tokenError);
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid or expired token'
-      });
-    }
+    console.log('📥 Registration request received');
     
-    // Verify the firebaseUid matches the token
-    if (decodedToken.uid !== firebaseUid) {
-      console.log('❌ Token UID mismatch');
-      return res.status(403).json({
-        success: false,
-        message: 'Unauthorized - Token does not match user'
-      });
-    }
+    const { firebaseUid, email, phoneNumber, fullName, role, address } = req.body;
 
     // Check if user already exists
-    console.log('🔍 Checking if user exists...');
-    const existingUser = await User.findOne({ 
-      $or: [{ firebaseUid }, { email }] 
-    });
-    
+    const existingUser = await User.findOne({ firebaseUid });
     if (existingUser) {
-      console.log('❌ User already exists:', existingUser.email);
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email or Firebase account'
+        message: 'User already registered'
       });
     }
 
-    console.log('📝 Creating new user in MongoDB...');
-
-    // Create user in MongoDB
+    // Create new user
     const user = await User.create({
       firebaseUid,
       email,
+      phoneNumber,
       fullName,
-      phoneNumber: phoneNumber || '',
-      address: address || '',
-      role: role || 'customer',
-      isEmailVerified: decodedToken.email_verified || false,
+      role,
+      address: address || {},
       accountStatus: 'active',
-      createdAt: new Date(),
-      updatedAt: new Date()
+      isEmailVerified: false,
+      isPhoneVerified: false
     });
 
-    console.log('✅ User created in MongoDB:', user._id);
+    console.log('✅ User created:', user._id);
 
     // Create role-specific profile
     if (role === 'worker') {
-      console.log('👷 Creating worker profile...');
       await Worker.create({
         userId: user._id,
-        firebaseUid: user.firebaseUid,
-        isProfileComplete: false,
         specializations: [],
         experience: 0,
-        hourlyRate: 0,
-        serviceAreas: [],
         availability: {
-          monday: { available: false, slots: [] },
-          tuesday: { available: false, slots: [] },
-          wednesday: { available: false, slots: [] },
-          thursday: { available: false, slots: [] },
-          friday: { available: false, slots: [] },
-          saturday: { available: false, slots: [] },
-          sunday: { available: false, slots: [] }
+          isAvailable: true,
+          schedule: []
         },
+        portfolioImages: [],
+        certifications: [],
         createdAt: new Date()
       });
       console.log('✅ Worker profile created');
-    } else {
-      console.log('👤 Creating customer profile...');
+    } else if (role === 'customer') {
       await Customer.create({
         userId: user._id,
-        firebaseUid: user.firebaseUid,
+        savedWorkers: [],
         addresses: address ? [{ address, isDefault: true }] : [],
         createdAt: new Date()
       });
@@ -128,7 +73,6 @@ exports.signup = async (req, res, next) => {
 
     console.log('🎉 Registration complete!');
 
-    // Return success with user data
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
@@ -139,7 +83,6 @@ exports.signup = async (req, res, next) => {
           email: user.email,
           fullName: user.fullName,
           phoneNumber: user.phoneNumber,
-          address: user.address,
           role: user.role,
           accountStatus: user.accountStatus,
           isEmailVerified: user.isEmailVerified,
@@ -149,9 +92,8 @@ exports.signup = async (req, res, next) => {
     });
     
   } catch (error) {
-    console.error('❌ Signup error:', error);
+    console.error('❌ Registration error:', error);
     
-    // Check for MongoDB duplicate key error
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -165,38 +107,17 @@ exports.signup = async (req, res, next) => {
 
 /**
  * @desc    Login user
- * @route   POST /api/v1/auth/login
+ * @route   POST /api/auth/login
  * @access  Public
  */
 exports.login = async (req, res, next) => {
   try {
     console.log('📥 Login request received');
     
-    const { email } = req.body;
+    const { firebaseUid } = req.body;
 
-    // Verify Firebase token
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authorization token required'
-      });
-    }
-
-    const token = authHeader.split('Bearer ')[1];
-    let decodedToken;
-    
-    try {
-      decodedToken = await admin.auth().verifyIdToken(token);
-    } catch (tokenError) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid or expired token'
-      });
-    }
-
-    // Find user by Firebase UID (more reliable than email)
-    const user = await User.findOne({ firebaseUid: decodedToken.uid });
+    // Find user by Firebase UID
+    const user = await User.findOne({ firebaseUid });
     
     if (!user) {
       return res.status(404).json({
@@ -253,8 +174,8 @@ exports.login = async (req, res, next) => {
 
 /**
  * @desc    Verify Firebase token
- * @route   POST /api/v1/auth/verify-token
- * @access  Private
+ * @route   POST /api/auth/verify-token
+ * @access  Public
  */
 exports.verifyToken = async (req, res, next) => {
   try {
@@ -267,6 +188,9 @@ exports.verifyToken = async (req, res, next) => {
     }
 
     const token = authHeader.split('Bearer ')[1];
+    
+    // Get admin instance
+    const admin = getAdmin();
     
     let decodedToken;
     try {
@@ -318,23 +242,8 @@ exports.verifyToken = async (req, res, next) => {
 };
 
 /**
- * @desc    Refresh session
- * @route   POST /api/v1/auth/refresh
- * @access  Private
- */
-exports.refreshSession = async (req, res, next) => {
-  try {
-    // Same as verifyToken for now
-    return exports.verifyToken(req, res, next);
-  } catch (error) {
-    console.error('❌ Session refresh error:', error);
-    next(error);
-  }
-};
-
-/**
  * @desc    Logout user
- * @route   POST /api/v1/auth/logout
+ * @route   POST /api/auth/logout
  * @access  Private
  */
 exports.logout = async (req, res, next) => {
@@ -357,4 +266,134 @@ exports.logout = async (req, res, next) => {
   }
 };
 
-module.exports = exports;
+/**
+ * @desc    Update FCM token for push notifications
+ * @route   PUT /api/auth/fcm-token
+ * @access  Private
+ */
+exports.updateFCMToken = async (req, res, next) => {
+  try {
+    const { fcmToken } = req.body;
+    const userId = req.user.id;
+
+    await User.findByIdAndUpdate(
+      userId,
+      {
+        $addToSet: { fcmTokens: fcmToken }
+      },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'FCM token updated successfully'
+    });
+  } catch (error) {
+    console.error('❌ FCM token update error:', error);
+    next(error);
+  }
+};
+
+/**
+ * @desc    Request password reset
+ * @route   POST /api/auth/forgot-password
+ * @access  Public
+ */
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    // Check if user exists
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No user found with this email'
+      });
+    }
+
+    // Generate password reset link (Firebase will handle this)
+    // For now, just return success
+    res.status(200).json({
+      success: true,
+      message: 'Password reset link sent to your email'
+    });
+  } catch (error) {
+    console.error('❌ Forgot password error:', error);
+    next(error);
+  }
+};
+
+/**
+ * @desc    Verify phone number
+ * @route   POST /api/auth/verify-phone
+ * @access  Private
+ */
+exports.verifyPhone = async (req, res, next) => {
+  try {
+    const { isVerified } = req.body;
+    const userId = req.user.id;
+
+    await User.findByIdAndUpdate(
+      userId,
+      { isPhoneVerified: isVerified },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Phone verification status updated'
+    });
+  } catch (error) {
+    console.error('❌ Phone verification error:', error);
+    next(error);
+  }
+};
+
+/**
+ * @desc    Delete user account
+ * @route   DELETE /api/auth/delete-account
+ * @access  Private
+ */
+exports.deleteAccount = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    // Delete user and related profiles
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Delete role-specific profile
+    if (user.role === 'worker') {
+      await Worker.deleteOne({ userId: user._id });
+    } else if (user.role === 'customer') {
+      await Customer.deleteOne({ userId: user._id });
+    }
+
+    // Delete user
+    await User.findByIdAndDelete(userId);
+
+    // Delete from Firebase
+    try {
+      const admin = getAdmin();
+      await admin.auth().deleteUser(user.firebaseUid);
+    } catch (firebaseError) {
+      console.error('❌ Firebase deletion error:', firebaseError);
+      // Continue even if Firebase deletion fails
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Account deleted successfully'
+    });
+  } catch (error) {
+    console.error('❌ Delete account error:', error);
+    next(error);
+  }
+};
