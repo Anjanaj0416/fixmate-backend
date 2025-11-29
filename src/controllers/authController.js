@@ -13,14 +13,38 @@ const getAdmin = () => {
 
 /**
  * @desc    Register a new user
- * @route   POST /api/auth/register
+ * @route   POST /api/auth/register OR POST /api/auth/signup
  * @access  Public
+ * 
+ * ✅ FIXED: Creates Worker with all required fields and correct types
  */
 exports.register = async (req, res, next) => {
   try {
     console.log('📥 Registration request received');
     
     const { firebaseUid, email, phoneNumber, fullName, role, address } = req.body;
+
+    // Validate required fields
+    if (!firebaseUid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Firebase UID is required'
+      });
+    }
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    if (!role) {
+      return res.status(400).json({
+        success: false,
+        message: 'Role is required'
+      });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ firebaseUid });
@@ -46,26 +70,55 @@ exports.register = async (req, res, next) => {
 
     console.log('✅ User created:', user._id);
 
-    // ✅ CRITICAL FIX: Create role-specific profile with firebaseUid
+    // ✅ CRITICAL FIX: Create role-specific profile with ALL required fields
     if (role === 'worker') {
+      // For worker registration, create with MINIMAL required fields
+      // The worker will complete their profile in the Worker Registration Flow
       await Worker.create({
         userId: user._id,
-        firebaseUid: firebaseUid,  // ✅ ADDED: Required field from Worker model
-        specializations: [],
-        experience: 0,
-        availability: {
-          isAvailable: true,
-          schedule: []
+        firebaseUid: firebaseUid,
+        
+        // ✅ FIX: Set required fields with default values
+        specializations: ['other'], // Default - will be updated in registration flow
+        experience: 0, // Default - will be updated in registration flow
+        hourlyRate: 0, // Default - will be updated in registration flow
+        
+        // ✅ FIX: availability should be Boolean, not Object
+        availability: true, // Simple boolean as per Worker model
+        
+        // Optional fields with defaults
+        workingHours: {
+          monday: { start: '09:00', end: '17:00', available: true },
+          tuesday: { start: '09:00', end: '17:00', available: true },
+          wednesday: { start: '09:00', end: '17:00', available: true },
+          thursday: { start: '09:00', end: '17:00', available: true },
+          friday: { start: '09:00', end: '17:00', available: true },
+          saturday: { start: '09:00', end: '17:00', available: true },
+          sunday: { start: '09:00', end: '17:00', available: false }
         },
-        portfolioImages: [],
+        serviceLocations: [],
+        portfolio: [],
+        bio: '',
+        skills: [],
         certifications: [],
-        createdAt: new Date()
+        rating: {
+          average: 0,
+          count: 0
+        },
+        completedJobs: 0,
+        totalEarnings: 0,
+        responseTime: 0,
+        acceptanceRate: 0,
+        isVerified: false,
+        verificationDocuments: [],
+        profileStatus: 'incomplete' // Will be set to 'active' after completing registration
       });
-      console.log('✅ Worker profile created');
+      console.log('✅ Worker profile created with default values');
+      
     } else if (role === 'customer') {
       await Customer.create({
         userId: user._id,
-        firebaseUid: firebaseUid,  // ✅ ADDED: Required field from Customer model
+        firebaseUid: firebaseUid,
         savedWorkers: [],
         addresses: address ? [{ address, isDefault: true }] : [],
         createdAt: new Date()
@@ -100,6 +153,20 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'User already exists with this email'
+      });
+    }
+    
+    // Log validation errors in detail
+    if (error.name === 'ValidationError') {
+      console.error('Validation Error Details:');
+      Object.keys(error.errors).forEach(key => {
+        console.error(`  - ${key}: ${error.errors[key].message}`);
+      });
+      
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: error.errors
       });
     }
     
@@ -381,3 +448,5 @@ exports.deleteAccount = async (req, res, next) => {
     next(error);
   }
 };
+
+module.exports = exports;
