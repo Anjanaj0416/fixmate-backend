@@ -1,7 +1,23 @@
 const mongoose = require('mongoose');
 
+/**
+ * Worker Model Schema
+ * 
+ * ✅ UPDATED: Fixed specializations validation error
+ * 
+ * CHANGES MADE:
+ * 1. OLD: specializations (enum-based) → NEW: serviceCategories (enum-based)
+ * 2. NEW: specializations (flexible string array, no enum restriction)
+ * 
+ * This allows:
+ * - serviceCategories: ['plumbing'] ← For filtering/searching
+ * - specializations: ['Drain Cleaning', 'Pipe Repair'] ← For display/detail
+ */
+
 const workerSchema = new mongoose.Schema({
-  // Reference to User
+  // ==========================================
+  // USER REFERENCE
+  // ==========================================
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -15,8 +31,12 @@ const workerSchema = new mongoose.Schema({
     unique: true
   },
   
-  // Professional Information
-  specializations: [{
+  // ==========================================
+  // ✅ UPDATED: SERVICE INFORMATION
+  // ==========================================
+  
+  // ✅ NEW FIELD: Main service categories (enum-based for filtering)
+  serviceCategories: [{
     type: String,
     required: true,
     enum: [
@@ -38,42 +58,89 @@ const workerSchema = new mongoose.Schema({
     ]
   }],
   
+  // ✅ UPDATED FIELD: Detailed specializations (flexible, no enum)
+  // This field now accepts ANY string value like "Drain Cleaning", "Pipe Repair", etc.
+  specializations: [{
+    type: String,
+    required: false  // Changed from true to false
+    // NO ENUM - accepts any specialization string
+  }],
+  
+  // ==========================================
+  // PROFESSIONAL INFORMATION
+  // ==========================================
   experience: {
     type: Number, // Years of experience
     required: true,
     min: 0
   },
   
-  // Pricing
+  // ==========================================
+  // PRICING
+  // ==========================================
   hourlyRate: {
     type: Number,
     required: true,
     min: 0
   },
   
-  // Availability
+  // ==========================================
+  // AVAILABILITY
+  // ==========================================
   availability: {
     type: Boolean,
     default: true
   },
   
   workingHours: {
-    monday: { start: String, end: String, available: { type: Boolean, default: true } },
-    tuesday: { start: String, end: String, available: { type: Boolean, default: true } },
-    wednesday: { start: String, end: String, available: { type: Boolean, default: true } },
-    thursday: { start: String, end: String, available: { type: Boolean, default: true } },
-    friday: { start: String, end: String, available: { type: Boolean, default: true } },
-    saturday: { start: String, end: String, available: { type: Boolean, default: true } },
-    sunday: { start: String, end: String, available: { type: Boolean, default: false } }
+    monday: { 
+      start: String, 
+      end: String, 
+      available: { type: Boolean, default: true } 
+    },
+    tuesday: { 
+      start: String, 
+      end: String, 
+      available: { type: Boolean, default: true } 
+    },
+    wednesday: { 
+      start: String, 
+      end: String, 
+      available: { type: Boolean, default: true } 
+    },
+    thursday: { 
+      start: String, 
+      end: String, 
+      available: { type: Boolean, default: true } 
+    },
+    friday: { 
+      start: String, 
+      end: String, 
+      available: { type: Boolean, default: true } 
+    },
+    saturday: { 
+      start: String, 
+      end: String, 
+      available: { type: Boolean, default: true } 
+    },
+    sunday: { 
+      start: String, 
+      end: String, 
+      available: { type: Boolean, default: false } 
+    }
   },
   
-  // Location & Service Area
+  // ==========================================
+  // LOCATION & SERVICE AREA
+  // ==========================================
   serviceLocations: [{
     city: String,
     district: String
   }],
   
-  // Portfolio
+  // ==========================================
+  // PORTFOLIO
+  // ==========================================
   portfolio: [{
     imageUrl: String, // URL or base64
     caption: String,
@@ -83,7 +150,9 @@ const workerSchema = new mongoose.Schema({
     }
   }],
   
-  // Bio & Description
+  // ==========================================
+  // PROFILE INFORMATION
+  // ==========================================
   bio: {
     type: String,
     maxlength: 500,
@@ -101,7 +170,9 @@ const workerSchema = new mongoose.Schema({
     imageUrl: String
   }],
   
-  // Rating & Reviews
+  // ==========================================
+  // RATING & REVIEWS
+  // ==========================================
   rating: {
     average: {
       type: Number,
@@ -115,7 +186,9 @@ const workerSchema = new mongoose.Schema({
     }
   },
   
-  // Statistics
+  // ==========================================
+  // STATISTICS
+  // ==========================================
   completedJobs: {
     type: Number,
     default: 0
@@ -136,14 +209,16 @@ const workerSchema = new mongoose.Schema({
     default: 0
   },
   
-  // Verification
+  // ==========================================
+  // VERIFICATION
+  // ==========================================
   isVerified: {
     type: Boolean,
     default: false
   },
   
   verificationDocuments: [{
-    type: String,
+    url: String,
     docType: String,
     uploadedAt: Date,
     status: {
@@ -153,14 +228,18 @@ const workerSchema = new mongoose.Schema({
     }
   }],
   
-  // Profile Status
+  // ==========================================
+  // PROFILE STATUS
+  // ==========================================
   profileStatus: {
     type: String,
     enum: ['incomplete', 'pending-review', 'active', 'suspended'],
     default: 'incomplete'
   },
   
-  // Bank Details (for payments)
+  // ==========================================
+  // BANK DETAILS
+  // ==========================================
   bankDetails: {
     accountName: String,
     accountNumber: String,
@@ -172,7 +251,9 @@ const workerSchema = new mongoose.Schema({
     }
   },
   
-  // Timestamps
+  // ==========================================
+  // TIMESTAMPS
+  // ==========================================
   createdAt: {
     type: Date,
     default: Date.now
@@ -186,14 +267,25 @@ const workerSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes
-// NOTE: userId and firebaseUid already have unique: true which creates indexes
+// ==========================================
+// INDEXES
+// ==========================================
+workerSchema.index({ userId: 1 });
+workerSchema.index({ firebaseUid: 1 });
+workerSchema.index({ serviceCategories: 1 }); // ✅ NEW: Index for filtering by category
 workerSchema.index({ specializations: 1 });
 workerSchema.index({ 'rating.average': -1 });
 workerSchema.index({ availability: 1 });
 workerSchema.index({ profileStatus: 1 });
+workerSchema.index({ 'serviceLocations.city': 1 });
 
-// Methods
+// ==========================================
+// METHODS
+// ==========================================
+
+/**
+ * Update worker rating with new review
+ */
 workerSchema.methods.updateRating = async function(newRating) {
   const totalRating = (this.rating.average * this.rating.count) + newRating;
   this.rating.count += 1;
@@ -201,15 +293,27 @@ workerSchema.methods.updateRating = async function(newRating) {
   await this.save();
 };
 
+/**
+ * Increment completed jobs counter
+ */
 workerSchema.methods.incrementCompletedJobs = async function() {
   this.completedJobs += 1;
   await this.save();
 };
 
-// Update timestamp before save
+// ==========================================
+// MIDDLEWARE
+// ==========================================
+
+/**
+ * Update timestamp before save
+ */
 workerSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
 
+// ==========================================
+// EXPORT
+// ==========================================
 module.exports = mongoose.model('Worker', workerSchema);

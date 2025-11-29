@@ -17,282 +17,250 @@ const getAdmin = () => {
  * 
  * ✅ FIXED: Accepts COMPLETE worker registration data from Worker Registration Flow
  */
+// Updated exports.register function in authController.js
+// This replaces the worker profile creation section (around line 200-300)
+
 exports.register = async (req, res, next) => {
   try {
-    console.log('📥 Registration request received');
+    console.log('\n📨 Registration request received');
     console.log('Role:', req.body.role);
-    
-    const {  
-      // Basic user info
-      firebaseUid, 
-      email, 
-      phoneNumber, 
-      fullName,
+
+    const {
       firstName,
       lastName,
-      role,
+      fullName,
+      email,
+      phoneNumber,
       address,
-      
-      // Worker-specific fields (from Worker Registration Flow)
-      serviceCategory,
+      role,
+      firebaseUid,
+      // Worker-specific fields
+      serviceCategories,
       specializations,
-      yearsOfExperience,
-      languagesSpoken,
+      experience,
+      hourlyRate,
+      skills,
       bio,
-      
-      // Business info
-      businessName,
-      businessAddress,
-      city,
-      stateProvince,
-      postalCode,
-      website,
-      
-      // Service area
-      serviceArea,
-      serviceAddress,
-      serviceCity,
-      serviceProvince,
-      servicePostalCode,
-      serviceRadius,
-      
-      // Pricing
-      pricing,
-      dailyWage,
-      halfDayRate,
-      minimumCharge,
-      overtimeHourlyRate,
-      
-      // Availability & Settings
+      serviceLocations,
       availability,
-      availableDays,
       workingHours,
-      availableOnWeekends,
-      emergencyServices,
-      ownTools,
-      vehicleAvailable,
-      certified,
-      insured,
-      whatsappAvailable
+      settings
     } = req.body;
 
     // Validate required fields
-    if (!firebaseUid) {
+    if (!email || !firebaseUid || !role) {
       return res.status(400).json({
         success: false,
-        message: 'Firebase UID is required'
-      });
-    }
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is required'
-      });
-    }
-
-    if (!role) {
-      return res.status(400).json({
-        success: false,
-        message: 'Role is required'
+        message: 'Missing required fields: email, firebaseUid, or role'
       });
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ firebaseUid });
+    let existingUser = await User.findOne({
+      $or: [{ email }, { firebaseUid }]
+    });
+
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'User already registered'
+        message: 'User already exists'
       });
     }
 
     // Create new user
-    const user = await User.create({
-      firebaseUid,
+    const newUser = await User.create({
+      firstName: firstName || '',
+      lastName: lastName || '',
+      fullName: fullName || `${firstName || ''} ${lastName || ''}`.trim(),
       email,
-      phoneNumber,
-      fullName: fullName || `${firstName} ${lastName}`,
+      phoneNumber: phoneNumber || '',
+      address: address || '',
       role,
-      address: address || {},
-      accountStatus: 'active',
-      isEmailVerified: false,
-      isPhoneVerified: true // Assuming phone was verified in BasicInfoRegistration
+      firebaseUid,
+      emailVerified: true,
+      phoneVerified: !!phoneNumber
     });
 
-    console.log('✅ User created:', user._id);
+    console.log('✅ User created:', newUser._id);
 
-    // Create role-specific profile
+    // Handle worker registration
     if (role === 'worker') {
       console.log('🔧 Creating worker profile with complete data...');
-      
-      // ✅ Build working hours from the form data
-      const buildWorkingHours = () => {
-        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        const hours = {};
-        
-        days.forEach(day => {
-          hours[day] = {
-            start: workingHours?.startTime || '08:00',
-            end: workingHours?.endTime || '18:00',
-            available: availableDays ? availableDays.includes(day) : (day !== 'sunday')
-          };
+
+      try {
+        // ✅ FIXED: Create worker profile with corrected field mapping
+        const workerProfile = await Worker.create({
+          userId: newUser._id,
+          firebaseUid: newUser.firebaseUid,
+
+          // ✅ Service categories (enum-based, required)
+          serviceCategories: serviceCategories || [],
+
+          // ✅ Detailed specializations (flexible strings)
+          specializations: specializations || [],
+
+          // Professional info
+          experience: experience || 0,
+          hourlyRate: hourlyRate || 0,
+
+          // Skills (languages, etc.)
+          skills: skills || [],
+
+          // Bio
+          bio: bio || '',
+
+          // Service area
+          serviceLocations: serviceLocations || [],
+
+          // Availability
+          availability: availability !== false,
+
+          // ✅ Working hours (ensure all days are present)
+          workingHours: workingHours || {
+            monday: { start: '08:00', end: '18:00', available: true },
+            tuesday: { start: '08:00', end: '18:00', available: true },
+            wednesday: { start: '08:00', end: '18:00', available: true },
+            thursday: { start: '08:00', end: '18:00', available: true },
+            friday: { start: '08:00', end: '18:00', available: true },
+            saturday: { start: '08:00', end: '18:00', available: false },
+            sunday: { start: '08:00', end: '18:00', available: false }
+          },
+
+          // Set profile as active since registration is complete
+          profileStatus: 'active',
+
+          // Initialize rating
+          rating: {
+            average: 0,
+            count: 0
+          },
+
+          // Initialize statistics
+          completedJobs: 0,
+          totalEarnings: 0,
+          responseTime: 0,
+          acceptanceRate: 0,
+
+          // Verification
+          isVerified: false
         });
-        
-        return hours;
-      };
 
-      // ✅ Calculate hourly rate from daily wage
-      const calculateHourlyRate = () => {
-        if (dailyWage) {
-          return Math.round(parseFloat(dailyWage) / 8); // Assuming 8-hour workday
-        }
-        if (pricing && pricing.dailyWage) {
-          return Math.round(parseFloat(pricing.dailyWage) / 8);
-        }
-        return 1000; // Default minimum
-      };
+        console.log('✅ Worker profile created successfully:', workerProfile._id);
+        console.log('Worker data:', {
+          serviceCategories: workerProfile.serviceCategories,
+          specializations: workerProfile.specializations,
+          experience: workerProfile.experience,
+          hourlyRate: workerProfile.hourlyRate,
+          profileStatus: workerProfile.profileStatus
+        });
 
-      // ✅ Build service locations array
-      const buildServiceLocations = () => {
-        if (serviceArea) {
-          return [{
-            city: serviceArea.city || serviceCity,
-            district: serviceArea.province || serviceProvince,
-            address: serviceArea.address || serviceAddress,
-            postalCode: serviceArea.postalCode || servicePostalCode
-          }];
-        }
-        if (serviceCity || serviceAddress) {
-          return [{
-            city: serviceCity,
-            district: serviceProvince || 'sri lanka',
-            address: serviceAddress,
-            postalCode: servicePostalCode
-          }];
-        }
-        return [];
-      };
+        // Return success response with both user and worker data
+        return res.status(201).json({
+          success: true,
+          message: 'Worker registered successfully',
+          data: {
+            user: {
+              id: newUser._id,
+              email: newUser.email,
+              fullName: newUser.fullName,
+              role: newUser.role,
+              firebaseUid: newUser.firebaseUid
+            },
+            worker: {
+              id: workerProfile._id,
+              serviceCategories: workerProfile.serviceCategories,
+              specializations: workerProfile.specializations,
+              experience: workerProfile.experience,
+              hourlyRate: workerProfile.hourlyRate,
+              profileStatus: workerProfile.profileStatus
+            }
+          }
+        });
 
-      // ✅ Create worker with COMPLETE profile data
-      await Worker.create({
-        userId: user._id,
-        firebaseUid: firebaseUid,
-        
-        // ✅ Service information (from form, not defaults)
-        specializations: specializations && specializations.length > 0 
-          ? specializations 
-          : [serviceCategory || 'other'],
-        experience: yearsOfExperience ? parseInt(yearsOfExperience) : 0,
-        
-        // ✅ Pricing (from form)
-        hourlyRate: calculateHourlyRate(),
-        
-        // ✅ Boolean availability (NOT an object!)
-        availability: availability !== undefined 
-          ? (typeof availability === 'boolean' ? availability : true)
-          : true,
-        
-        // ✅ Complete working hours from form
-        workingHours: buildWorkingHours(),
-        
-        // ✅ Service locations from form
-        serviceLocations: buildServiceLocations(),
-        
-        // ✅ Profile information from form
-        bio: bio || '',
-        skills: specializations || [],
-        
-        // Portfolio (empty for now, can be added later)
-        portfolio: [],
-        certifications: [],
-        
-        // Rating & Statistics (start at 0)
-        rating: {
-          average: 0,
-          count: 0
-        },
-        completedJobs: 0,
-        totalEarnings: 0,
-        responseTime: 0,
-        acceptanceRate: 0,
-        
-        // Verification
-        isVerified: certified || false,
-        verificationDocuments: [],
-        
-        // ✅ Profile is COMPLETE now (not 'incomplete')
-        profileStatus: 'active'
-      });
-      
-      console.log('✅ Worker profile created with complete data from form');
-      console.log('   - Specializations:', specializations || [serviceCategory]);
-      console.log('   - Experience:', yearsOfExperience || 0, 'years');
-      console.log('   - Hourly Rate: LKR', calculateHourlyRate());
-      console.log('   - Service Locations:', buildServiceLocations().length);
-      
-    } else if (role === 'customer') {
-      await Customer.create({
-        userId: user._id,
-        firebaseUid: firebaseUid,
-        savedWorkers: [],
-        addresses: address ? [{
-          address: typeof address === 'string' ? address : address.address,
-          city: address.city || '',
-          district: address.district || '',
-          postalCode: address.postalCode || '',
-          isDefault: true
-        }] : [],
-        createdAt: new Date()
-      });
-      
-      console.log('✅ Customer profile created');
+      } catch (workerError) {
+        console.error('❌ Worker profile creation error:', workerError);
+
+        // If worker creation fails, delete the user
+        await User.findByIdAndDelete(newUser._id);
+
+        // Return detailed validation error
+        if (workerError.name === 'ValidationError') {
+          const errors = {};
+          for (let field in workerError.errors) {
+            errors[field] = workerError.errors[field].message;
+          }
+
+          console.error('❌ Validation Error Details:');
+          for (let field in errors) {
+            console.error(`   - ${field}: ${errors[field]}`);
+          }
+
+          return res.status(400).json({
+            success: false,
+            message: 'Validation failed',
+            details: {
+              message: workerError.message,
+              errors: errors
+            }
+          });
+        }
+
+        throw workerError;
+      }
     }
 
-    console.log('🎉 Registration complete!');
+    // Handle customer registration
+    if (role === 'customer') {
+      console.log('👤 Creating customer profile...');
 
-    res.status(201).json({
+      const customerProfile = await Customer.create({
+        userId: newUser._id,
+        firebaseUid: newUser.firebaseUid,
+        preferredPaymentMethod: 'cash',
+        savedAddresses: address ? [{
+          label: 'Home',
+          address: address,
+          isDefault: true
+        }] : []
+      });
+
+      console.log('✅ Customer profile created:', customerProfile._id);
+
+      return res.status(201).json({
+        success: true,
+        message: 'Customer registered successfully',
+        data: {
+          user: {
+            id: newUser._id,
+            email: newUser.email,
+            fullName: newUser.fullName,
+            role: newUser.role,
+            firebaseUid: newUser.firebaseUid
+          },
+          customer: {
+            id: customerProfile._id
+          }
+        }
+      });
+    }
+
+    // If role is neither worker nor customer
+    return res.status(201).json({
       success: true,
       message: 'User registered successfully',
       data: {
         user: {
-          id: user._id,
-          firebaseUid: user.firebaseUid,
-          email: user.email,
-          fullName: user.fullName,
-          phoneNumber: user.phoneNumber,
-          role: user.role,
-          accountStatus: user.accountStatus,
-          isEmailVerified: user.isEmailVerified,
-          createdAt: user.createdAt
+          id: newUser._id,
+          email: newUser.email,
+          fullName: newUser.fullName,
+          role: newUser.role,
+          firebaseUid: newUser.firebaseUid
         }
       }
     });
-    
+
   } catch (error) {
     console.error('❌ Registration error:', error);
-    
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'User already exists with this email or phone number'
-      });
-    }
-    
-    // Log validation errors in detail
-    if (error.name === 'ValidationError') {
-      console.error('❌ Validation Error Details:');
-      Object.keys(error.errors).forEach(key => {
-        console.error(`   - ${key}: ${error.errors[key].message}`);
-      });
-      
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed: ' + Object.keys(error.errors).map(k => error.errors[k].message).join(', '),
-        errors: error.errors
-      });
-    }
-    
     next(error);
   }
 };
@@ -305,12 +273,12 @@ exports.register = async (req, res, next) => {
 exports.login = async (req, res, next) => {
   try {
     console.log('📥 Login request received');
-    
+
     const { firebaseUid } = req.body;
 
     // Find user by Firebase UID
     const user = await User.findOne({ firebaseUid });
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -380,10 +348,10 @@ exports.verifyToken = async (req, res, next) => {
     }
 
     const token = authHeader.split('Bearer ')[1];
-    
+
     // Get admin instance
     const admin = getAdmin();
-    
+
     let decodedToken;
     try {
       decodedToken = await admin.auth().verifyIdToken(token);
@@ -396,7 +364,7 @@ exports.verifyToken = async (req, res, next) => {
 
     // Find user
     const user = await User.findOne({ firebaseUid: decodedToken.uid });
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
