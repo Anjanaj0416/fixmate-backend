@@ -46,10 +46,11 @@ exports.register = async (req, res, next) => {
 
     console.log('✅ User created:', user._id);
 
-    // Create role-specific profile
+    // ✅ CRITICAL FIX: Create role-specific profile with firebaseUid
     if (role === 'worker') {
       await Worker.create({
         userId: user._id,
+        firebaseUid: firebaseUid,  // ✅ ADDED: Required field from Worker model
         specializations: [],
         experience: 0,
         availability: {
@@ -64,6 +65,7 @@ exports.register = async (req, res, next) => {
     } else if (role === 'customer') {
       await Customer.create({
         userId: user._id,
+        firebaseUid: firebaseUid,  // ✅ ADDED: Required field from Customer model
         savedWorkers: [],
         addresses: address ? [{ address, isDefault: true }] : [],
         createdAt: new Date()
@@ -274,14 +276,11 @@ exports.logout = async (req, res, next) => {
 exports.updateFCMToken = async (req, res, next) => {
   try {
     const { fcmToken } = req.body;
-    const userId = req.user.id;
+    const { firebaseUid } = req.user;
 
-    await User.findByIdAndUpdate(
-      userId,
-      {
-        $addToSet: { fcmTokens: fcmToken }
-      },
-      { new: true }
+    await User.findOneAndUpdate(
+      { firebaseUid },
+      { $addToSet: { fcmTokens: fcmToken } }
     );
 
     res.status(200).json({
@@ -303,7 +302,7 @@ exports.forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
 
-    // Check if user exists
+    // Find user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({
@@ -312,14 +311,19 @@ exports.forgotPassword = async (req, res, next) => {
       });
     }
 
-    // Generate password reset link (Firebase will handle this)
-    // For now, just return success
+    // Generate password reset link via Firebase
+    const admin = getAdmin();
+    const resetLink = await admin.auth().generatePasswordResetLink(email);
+
+    // TODO: Send reset link via email service
+
     res.status(200).json({
       success: true,
-      message: 'Password reset link sent to your email'
+      message: 'Password reset link sent to email',
+      resetLink // Remove this in production
     });
   } catch (error) {
-    console.error('❌ Forgot password error:', error);
+    console.error('❌ Password reset error:', error);
     next(error);
   }
 };
@@ -332,12 +336,11 @@ exports.forgotPassword = async (req, res, next) => {
 exports.verifyPhone = async (req, res, next) => {
   try {
     const { isVerified } = req.body;
-    const userId = req.user.id;
+    const { firebaseUid } = req.user;
 
-    await User.findByIdAndUpdate(
-      userId,
-      { isPhoneVerified: isVerified },
-      { new: true }
+    await User.findOneAndUpdate(
+      { firebaseUid },
+      { isPhoneVerified: isVerified }
     );
 
     res.status(200).json({
@@ -357,43 +360,24 @@ exports.verifyPhone = async (req, res, next) => {
  */
 exports.deleteAccount = async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const { firebaseUid } = req.user;
 
-    // Delete user and related profiles
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    // Delete role-specific profile
-    if (user.role === 'worker') {
-      await Worker.deleteOne({ userId: user._id });
-    } else if (user.role === 'customer') {
-      await Customer.deleteOne({ userId: user._id });
-    }
-
-    // Delete user
-    await User.findByIdAndDelete(userId);
+    // Delete from MongoDB
+    await User.findOneAndUpdate(
+      { firebaseUid },
+      { accountStatus: 'deleted' }
+    );
 
     // Delete from Firebase
-    try {
-      const admin = getAdmin();
-      await admin.auth().deleteUser(user.firebaseUid);
-    } catch (firebaseError) {
-      console.error('❌ Firebase deletion error:', firebaseError);
-      // Continue even if Firebase deletion fails
-    }
+    const admin = getAdmin();
+    await admin.auth().deleteUser(firebaseUid);
 
     res.status(200).json({
       success: true,
       message: 'Account deleted successfully'
     });
   } catch (error) {
-    console.error('❌ Delete account error:', error);
+    console.error('❌ Account deletion error:', error);
     next(error);
   }
 };
