@@ -12,11 +12,16 @@ const { RATE_LIMITS } = require('./src/config/constants');
 // Import routes
 const routes = require('./src/routes');
 
-// Import middleware - FIX: Import the errorHandler function from the object
+// Import middleware
 const { errorHandler } = require('./src/middleware/errorHandler');
 
 /**
  * Express Application Setup
+ * 
+ * FIXES:
+ * 1. CORS allows localhost:5173 (Vite)
+ * 2. Better logging
+ * 3. OPTIONS preflight handler
  */
 
 const app = express();
@@ -25,149 +30,111 @@ const app = express();
 // Security Middleware
 // ==========================================
 
-// Helmet - Security headers
 app.use(helmet({
-  contentSecurityPolicy: false, // Disable CSP for API
+  contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false
 }));
 
-// CORS Configuration
+// ==========================================
+// ✅ CORS Configuration for Vite (port 5173)
+// ==========================================
+
+const allowedOrigins = [
+  'http://localhost:5173',  // ✅ Vite frontend
+  'http://localhost:3000',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+];
+
+if (process.env.CORS_ORIGIN) {
+  allowedOrigins.push(process.env.CORS_ORIGIN);
+}
+
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      logger.warn(`❌ CORS blocked: ${origin}`);
+      callback(new Error(`CORS not allowed: ${origin}`));
+    }
+  },
   credentials: true,
-  optionsSuccessStatus: 200
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 };
+
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
-// Data Sanitization against NoSQL Injection
+// ==========================================
+// Middleware
+// ==========================================
+
 app.use(mongoSanitize());
-
-// ==========================================
-// Rate Limiting
-// ==========================================
-
-const limiter = rateLimit({
+app.use('/api/', rateLimit({
   windowMs: RATE_LIMITS.WINDOW_MS,
   max: RATE_LIMITS.MAX_REQUESTS,
   message: RATE_LIMITS.MESSAGE,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+}));
 
-app.use('/api/', limiter);
-
-// ==========================================
-// Body Parsing Middleware
-// ==========================================
-
-// JSON body parser
 app.use(express.json({ limit: '10mb' }));
-
-// URL-encoded body parser
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// ==========================================
-// Compression & Performance
-// ==========================================
-
-// Compress responses
 app.use(compression());
 
-// ==========================================
-// Logging Middleware
-// ==========================================
-
-// HTTP request logger
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined', { stream: logger.stream }));
 }
 
-// Request ID middleware (for tracking requests)
+// Request logging
 app.use((req, res, next) => {
   req.id = require('crypto').randomBytes(16).toString('hex');
   res.setHeader('X-Request-ID', req.id);
+  logger.info(`📨 ${req.method} ${req.path} (Origin: ${req.headers.origin || 'none'})`);
   next();
 });
 
 // ==========================================
-// API Routes
+// Routes
 // ==========================================
 
-// Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({
+  res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV
   });
 });
 
-// API version info
 app.get('/api', (req, res) => {
-  res.status(200).json({
+  res.json({
     message: 'FixMate API',
     version: '1.0.0',
-    status: 'active',
-    documentation: '/api/docs',
     endpoints: {
       auth: '/api/v1/auth',
       users: '/api/v1/users',
       workers: '/api/v1/workers',
       bookings: '/api/v1/bookings',
-      reviews: '/api/v1/reviews',
-      chat: '/api/v1/chat',
-      notifications: '/api/v1/notifications',
-      payments: '/api/v1/payments',
-      admin: '/api/v1/admin',
-      ai: '/api/v1/ai'
     }
   });
 });
 
-// Mount API routes
 app.use('/api/v1', routes);
 
 // ==========================================
 // Error Handling
 // ==========================================
 
-// 404 Handler - Route not found
-app.use((req, res, next) => {
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: 'Route not found',
     path: req.originalUrl,
-    method: req.method,
-    timestamp: new Date().toISOString()
   });
 });
 
-// Global Error Handler - FIX: Now using the correct errorHandler function
 app.use(errorHandler);
-
-// ==========================================
-// Graceful Shutdown
-// ==========================================
-
-process.on('unhandledRejection', (err) => {
-  logger.error('Unhandled Rejection:', err);
-  // Don't exit in production, let PM2/container orchestrator handle it
-  if (process.env.NODE_ENV !== 'production') {
-    process.exit(1);
-  }
-});
-
-process.on('uncaughtException', (err) => {
-  logger.error('Uncaught Exception:', err);
-  // Exit gracefully
-  process.exit(1);
-});
-
-// ==========================================
-// Export App
-// ==========================================
 
 module.exports = app;

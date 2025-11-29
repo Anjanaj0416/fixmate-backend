@@ -5,7 +5,7 @@ const { authMiddleware } = require('../middleware/authMiddleware');
 const { validateRequest } = require('../middleware/validator');
 
 /**
- * @route   POST /api/auth/register
+ * @route   POST /api/v1/auth/register
  * @desc    Register a new user
  * @access  Public
  */
@@ -22,7 +22,26 @@ router.post(
 );
 
 /**
- * @route   POST /api/auth/login
+ * @route   POST /api/v1/auth/signup
+ * @desc    Register a new user (alternative endpoint for frontend)
+ * @access  Public
+ * 
+ * ✅ ADDED: Frontend calls /signup, so we need this route!
+ */
+router.post(
+  '/signup',
+  validateRequest([
+    'body.firebaseUid',
+    'body.email',
+    'body.phoneNumber',
+    'body.fullName',
+    'body.role'
+  ]),
+  authController.register  // Uses same controller as /register
+);
+
+/**
+ * @route   POST /api/v1/auth/login
  * @desc    Login user
  * @access  Public
  */
@@ -33,21 +52,21 @@ router.post(
 );
 
 /**
- * @route   POST /api/auth/logout
+ * @route   POST /api/v1/auth/logout
  * @desc    Logout user
  * @access  Private
  */
 router.post('/logout', authMiddleware, authController.logout);
 
 /**
- * @route   POST /api/auth/verify-token
+ * @route   POST /api/v1/auth/verify-token
  * @desc    Verify Firebase token
  * @access  Public
  */
 router.post('/verify-token', authController.verifyToken);
 
 /**
- * @route   PUT /api/auth/fcm-token
+ * @route   PUT /api/v1/auth/fcm-token
  * @desc    Update FCM token for push notifications
  * @access  Private
  */
@@ -59,7 +78,7 @@ router.put(
 );
 
 /**
- * @route   POST /api/auth/forgot-password
+ * @route   POST /api/v1/auth/forgot-password
  * @desc    Request password reset
  * @access  Public
  */
@@ -70,7 +89,7 @@ router.post(
 );
 
 /**
- * @route   POST /api/auth/verify-phone
+ * @route   POST /api/v1/auth/verify-phone
  * @desc    Verify phone number
  * @access  Private
  */
@@ -82,7 +101,7 @@ router.post(
 );
 
 /**
- * @route   DELETE /api/auth/delete-account
+ * @route   DELETE /api/v1/auth/delete-account
  * @desc    Delete user account
  * @access  Private
  */

@@ -9,9 +9,12 @@ const logger = require('./src/utils/logger');
 /**
  * FixMate Backend Server
  * Main entry point for the application
+ * 
+ * FIXED: Changed default port from 5000 to 5001 to match frontend expectations
  */
 
-const PORT = process.env.PORT || 5000;
+// ✅ FIX #1: Change port from 5000 to 5001
+const PORT = process.env.PORT || 5001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 /**
@@ -25,13 +28,13 @@ const initializeServices = async () => {
     // Connect to MongoDB
     logger.info('Connecting to MongoDB...');
     await connectDB();
-    logger.info('✓ MongoDB connected successfully');
+    logger.info('✅ MongoDB connected successfully');
     
     // Initialize Firebase Admin SDK
     logger.info('Initializing Firebase Admin SDK...');
     try {
       initializeFirebase();
-      logger.info('✓ Firebase Admin SDK initialized successfully');
+      logger.info('✅ Firebase Admin SDK initialized successfully');
     } catch (error) {
       logger.warn('Firebase initialization failed. Push notifications will be disabled.');
       logger.warn('Error:', error.message);
@@ -41,7 +44,7 @@ const initializeServices = async () => {
     logger.info('Checking Cloudinary configuration...');
     const cloudinaryInitialized = initializeCloudinary();
     if (cloudinaryInitialized) {
-      logger.info('✓ Cloudinary initialized successfully');
+      logger.info('✅ Cloudinary initialized successfully');
     } else {
       logger.info('Cloudinary not configured. Using MongoDB for image storage.');
     }
