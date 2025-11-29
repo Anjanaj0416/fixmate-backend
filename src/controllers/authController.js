@@ -5,7 +5,6 @@ const Customer = require('../models/Customer');
 
 /**
  * Get Firebase Admin (lazy loading)
- * This is called when needed, not at module load time
  */
 const getAdmin = () => {
   return getFirebaseAdmin();
@@ -16,13 +15,66 @@ const getAdmin = () => {
  * @route   POST /api/auth/register OR POST /api/auth/signup
  * @access  Public
  * 
- * ✅ FIXED: Creates Worker with all required fields and correct types
+ * ✅ FIXED: Accepts COMPLETE worker registration data from Worker Registration Flow
  */
 exports.register = async (req, res, next) => {
   try {
     console.log('📥 Registration request received');
+    console.log('Role:', req.body.role);
     
-    const { firebaseUid, email, phoneNumber, fullName, role, address } = req.body;
+    const {  
+      // Basic user info
+      firebaseUid, 
+      email, 
+      phoneNumber, 
+      fullName,
+      firstName,
+      lastName,
+      role,
+      address,
+      
+      // Worker-specific fields (from Worker Registration Flow)
+      serviceCategory,
+      specializations,
+      yearsOfExperience,
+      languagesSpoken,
+      bio,
+      
+      // Business info
+      businessName,
+      businessAddress,
+      city,
+      stateProvince,
+      postalCode,
+      website,
+      
+      // Service area
+      serviceArea,
+      serviceAddress,
+      serviceCity,
+      serviceProvince,
+      servicePostalCode,
+      serviceRadius,
+      
+      // Pricing
+      pricing,
+      dailyWage,
+      halfDayRate,
+      minimumCharge,
+      overtimeHourlyRate,
+      
+      // Availability & Settings
+      availability,
+      availableDays,
+      workingHours,
+      availableOnWeekends,
+      emergencyServices,
+      ownTools,
+      vehicleAvailable,
+      certified,
+      insured,
+      whatsappAvailable
+    } = req.body;
 
     // Validate required fields
     if (!firebaseUid) {
@@ -60,47 +112,102 @@ exports.register = async (req, res, next) => {
       firebaseUid,
       email,
       phoneNumber,
-      fullName,
+      fullName: fullName || `${firstName} ${lastName}`,
       role,
       address: address || {},
       accountStatus: 'active',
       isEmailVerified: false,
-      isPhoneVerified: false
+      isPhoneVerified: true // Assuming phone was verified in BasicInfoRegistration
     });
 
     console.log('✅ User created:', user._id);
 
-    // ✅ CRITICAL FIX: Create role-specific profile with ALL required fields
+    // Create role-specific profile
     if (role === 'worker') {
-      // For worker registration, create with MINIMAL required fields
-      // The worker will complete their profile in the Worker Registration Flow
+      console.log('🔧 Creating worker profile with complete data...');
+      
+      // ✅ Build working hours from the form data
+      const buildWorkingHours = () => {
+        const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const hours = {};
+        
+        days.forEach(day => {
+          hours[day] = {
+            start: workingHours?.startTime || '08:00',
+            end: workingHours?.endTime || '18:00',
+            available: availableDays ? availableDays.includes(day) : (day !== 'sunday')
+          };
+        });
+        
+        return hours;
+      };
+
+      // ✅ Calculate hourly rate from daily wage
+      const calculateHourlyRate = () => {
+        if (dailyWage) {
+          return Math.round(parseFloat(dailyWage) / 8); // Assuming 8-hour workday
+        }
+        if (pricing && pricing.dailyWage) {
+          return Math.round(parseFloat(pricing.dailyWage) / 8);
+        }
+        return 1000; // Default minimum
+      };
+
+      // ✅ Build service locations array
+      const buildServiceLocations = () => {
+        if (serviceArea) {
+          return [{
+            city: serviceArea.city || serviceCity,
+            district: serviceArea.province || serviceProvince,
+            address: serviceArea.address || serviceAddress,
+            postalCode: serviceArea.postalCode || servicePostalCode
+          }];
+        }
+        if (serviceCity || serviceAddress) {
+          return [{
+            city: serviceCity,
+            district: serviceProvince || 'sri lanka',
+            address: serviceAddress,
+            postalCode: servicePostalCode
+          }];
+        }
+        return [];
+      };
+
+      // ✅ Create worker with COMPLETE profile data
       await Worker.create({
         userId: user._id,
         firebaseUid: firebaseUid,
         
-        // ✅ FIX: Set required fields with default values
-        specializations: ['other'], // Default - will be updated in registration flow
-        experience: 0, // Default - will be updated in registration flow
-        hourlyRate: 0, // Default - will be updated in registration flow
+        // ✅ Service information (from form, not defaults)
+        specializations: specializations && specializations.length > 0 
+          ? specializations 
+          : [serviceCategory || 'other'],
+        experience: yearsOfExperience ? parseInt(yearsOfExperience) : 0,
         
-        // ✅ FIX: availability should be Boolean, not Object
-        availability: true, // Simple boolean as per Worker model
+        // ✅ Pricing (from form)
+        hourlyRate: calculateHourlyRate(),
         
-        // Optional fields with defaults
-        workingHours: {
-          monday: { start: '09:00', end: '17:00', available: true },
-          tuesday: { start: '09:00', end: '17:00', available: true },
-          wednesday: { start: '09:00', end: '17:00', available: true },
-          thursday: { start: '09:00', end: '17:00', available: true },
-          friday: { start: '09:00', end: '17:00', available: true },
-          saturday: { start: '09:00', end: '17:00', available: true },
-          sunday: { start: '09:00', end: '17:00', available: false }
-        },
-        serviceLocations: [],
+        // ✅ Boolean availability (NOT an object!)
+        availability: availability !== undefined 
+          ? (typeof availability === 'boolean' ? availability : true)
+          : true,
+        
+        // ✅ Complete working hours from form
+        workingHours: buildWorkingHours(),
+        
+        // ✅ Service locations from form
+        serviceLocations: buildServiceLocations(),
+        
+        // ✅ Profile information from form
+        bio: bio || '',
+        skills: specializations || [],
+        
+        // Portfolio (empty for now, can be added later)
         portfolio: [],
-        bio: '',
-        skills: [],
         certifications: [],
+        
+        // Rating & Statistics (start at 0)
         rating: {
           average: 0,
           count: 0
@@ -109,20 +216,36 @@ exports.register = async (req, res, next) => {
         totalEarnings: 0,
         responseTime: 0,
         acceptanceRate: 0,
-        isVerified: false,
+        
+        // Verification
+        isVerified: certified || false,
         verificationDocuments: [],
-        profileStatus: 'incomplete' // Will be set to 'active' after completing registration
+        
+        // ✅ Profile is COMPLETE now (not 'incomplete')
+        profileStatus: 'active'
       });
-      console.log('✅ Worker profile created with default values');
+      
+      console.log('✅ Worker profile created with complete data from form');
+      console.log('   - Specializations:', specializations || [serviceCategory]);
+      console.log('   - Experience:', yearsOfExperience || 0, 'years');
+      console.log('   - Hourly Rate: LKR', calculateHourlyRate());
+      console.log('   - Service Locations:', buildServiceLocations().length);
       
     } else if (role === 'customer') {
       await Customer.create({
         userId: user._id,
         firebaseUid: firebaseUid,
         savedWorkers: [],
-        addresses: address ? [{ address, isDefault: true }] : [],
+        addresses: address ? [{
+          address: typeof address === 'string' ? address : address.address,
+          city: address.city || '',
+          district: address.district || '',
+          postalCode: address.postalCode || '',
+          isDefault: true
+        }] : [],
         createdAt: new Date()
       });
+      
       console.log('✅ Customer profile created');
     }
 
@@ -152,20 +275,20 @@ exports.register = async (req, res, next) => {
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email'
+        message: 'User already exists with this email or phone number'
       });
     }
     
     // Log validation errors in detail
     if (error.name === 'ValidationError') {
-      console.error('Validation Error Details:');
+      console.error('❌ Validation Error Details:');
       Object.keys(error.errors).forEach(key => {
-        console.error(`  - ${key}: ${error.errors[key].message}`);
+        console.error(`   - ${key}: ${error.errors[key].message}`);
       });
       
       return res.status(400).json({
         success: false,
-        message: 'Validation failed',
+        message: 'Validation failed: ' + Object.keys(error.errors).map(k => error.errors[k].message).join(', '),
         errors: error.errors
       });
     }
