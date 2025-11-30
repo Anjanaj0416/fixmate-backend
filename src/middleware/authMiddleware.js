@@ -1,9 +1,11 @@
-const admin = require('../config/firebase-admin');
+const { getAuth } = require('../config/firebase-admin');
 const { User } = require('../models');
 
 /**
- * Authentication Middleware
+ * Authentication Middleware - FIXED VERSION
  * Verifies Firebase ID token and attaches user info to request
+ * 
+ * ✅ FIX: Changed from require('admin') to require Firebase from config
  */
 exports.authMiddleware = async (req, res, next) => {
   try {
@@ -26,10 +28,13 @@ exports.authMiddleware = async (req, res, next) => {
       });
     }
 
+    // ✅ FIX: Get Firebase Auth instance from config
+    const auth = getAuth();
+
     // Verify Firebase ID token
     let decodedToken;
     try {
-      decodedToken = await admin.auth().verifyIdToken(token);
+      decodedToken = await auth.verifyIdToken(token);
     } catch (firebaseError) {
       console.error('Firebase token verification failed:', firebaseError);
       
@@ -131,9 +136,12 @@ exports.optionalAuthMiddleware = async (req, res, next) => {
       return next();
     }
 
+    // ✅ FIX: Get Firebase Auth instance from config
+    const auth = getAuth();
+
     // Try to verify token
     try {
-      const decodedToken = await admin.auth().verifyIdToken(token);
+      const decodedToken = await auth.verifyIdToken(token);
       const user = await User.findOne({ firebaseUid: decodedToken.uid }).select(
         'firebaseUid email role accountStatus fullName _id'
       );
@@ -193,27 +201,15 @@ exports.requireEmailVerification = (req, res, next) => {
 };
 
 /**
- * Middleware to check if user owns the resource
- * @param {string} paramName - Name of the URL parameter containing the user ID
+ * Middleware to verify phone number is verified
  */
-exports.checkOwnership = (paramName = 'userId') => {
-  return (req, res, next) => {
-    const resourceUserId = req.params[paramName];
-    
-    if (!resourceUserId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Resource identifier not provided'
-      });
-    }
-
-    if (req.user._id.toString() !== resourceUserId && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have permission to access this resource'
-      });
-    }
-
-    next();
-  };
+exports.requirePhoneVerification = (req, res, next) => {
+  if (!req.user || !req.user.isPhoneVerified) {
+    return res.status(403).json({
+      success: false,
+      message: 'Please verify your phone number to access this resource.',
+      code: 'PHONE_NOT_VERIFIED'
+    });
+  }
+  next();
 };
