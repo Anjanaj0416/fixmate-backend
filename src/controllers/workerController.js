@@ -256,12 +256,12 @@ exports.getWorkerStats = async (req, res, next) => {
 
     // Get booking stats
     const totalBookings = await Booking.countDocuments({ workerId: user._id });
-    const pendingBookings = await Booking.countDocuments({ 
-      workerId: user._id, 
-      status: 'pending' 
+    const pendingBookings = await Booking.countDocuments({
+      workerId: user._id,
+      status: 'pending'
     });
-    const activeBookings = await Booking.countDocuments({ 
-      workerId: user._id, 
+    const activeBookings = await Booking.countDocuments({
+      workerId: user._id,
       status: { $in: ['accepted', 'in-progress'] }
     });
 
@@ -316,21 +316,23 @@ exports.getWorkerStats = async (req, res, next) => {
 };
 
 /**
- * ✅ NEW FUNCTION - Get current worker's profile
+ * ✅ COMPLETE FIX - Get current worker's profile WITH USER DATA
  * @desc    Get current worker's profile
  * @route   GET /api/v1/workers/profile
  * @access  Private/Worker
+ * 
+ * CRITICAL FIX: Added .populate('userId') to include user information
  */
 exports.getWorkerProfile = async (req, res, next) => {
   try {
     // Get firebaseUid from authenticated user (set by authMiddleware)
     const { firebaseUid } = req.user;
-    
+
     console.log('🔍 Getting worker profile for:', firebaseUid);
-    
+
     // Find user document
     const user = await User.findOne({ firebaseUid });
-    
+
     if (!user) {
       console.error('❌ User not found for firebaseUid:', firebaseUid);
       return res.status(404).json({
@@ -341,9 +343,10 @@ exports.getWorkerProfile = async (req, res, next) => {
 
     console.log('✅ User found:', user._id);
 
-    // Find worker profile
-    const worker = await Worker.findOne({ userId: user._id });
-    
+    // ✅ CRITICAL FIX: Added .populate('userId') to get user details
+    const worker = await Worker.findOne({ userId: user._id })
+      .populate('userId', 'fullName email phoneNumber profileImage location');
+
     if (!worker) {
       console.error('❌ Worker profile not found for userId:', user._id);
       return res.status(404).json({
@@ -352,20 +355,25 @@ exports.getWorkerProfile = async (req, res, next) => {
       });
     }
 
-    console.log('✅ Worker profile found:', {
+    console.log('✅ Worker profile found with user data:', {
       workerId: worker._id,
       serviceCategories: worker.serviceCategories,
       specializations: worker.specializations,
       experience: worker.experience,
-      hourlyRate: worker.hourlyRate
+      hourlyRate: worker.hourlyRate,
+      userId: {
+        fullName: worker.userId.fullName,
+        email: worker.userId.email,
+        phoneNumber: worker.userId.phoneNumber
+      }
     });
 
-    // Return worker data
+    // Return worker data with populated user information
     res.status(200).json({
       success: true,
       data: worker
     });
-    
+
   } catch (error) {
     console.error('❌ Error in getWorkerProfile:', error);
     next(error);
@@ -474,7 +482,7 @@ exports.getWorkerReviews = async (req, res, next) => {
       });
     }
 
-    const reviews = await Review.find({ 
+    const reviews = await Review.find({
       workerId: worker.userId,
       isVisible: true,
       moderationStatus: 'approved'
@@ -484,7 +492,7 @@ exports.getWorkerReviews = async (req, res, next) => {
       .skip((page - 1) * limit)
       .sort({ createdAt: -1 });
 
-    const count = await Review.countDocuments({ 
+    const count = await Review.countDocuments({
       workerId: worker.userId,
       isVisible: true,
       moderationStatus: 'approved'
