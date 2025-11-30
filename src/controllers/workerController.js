@@ -316,6 +316,63 @@ exports.getWorkerStats = async (req, res, next) => {
 };
 
 /**
+ * ✅ NEW FUNCTION - Get current worker's profile
+ * @desc    Get current worker's profile
+ * @route   GET /api/v1/workers/profile
+ * @access  Private/Worker
+ */
+exports.getWorkerProfile = async (req, res, next) => {
+  try {
+    // Get firebaseUid from authenticated user (set by authMiddleware)
+    const { firebaseUid } = req.user;
+    
+    console.log('🔍 Getting worker profile for:', firebaseUid);
+    
+    // Find user document
+    const user = await User.findOne({ firebaseUid });
+    
+    if (!user) {
+      console.error('❌ User not found for firebaseUid:', firebaseUid);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    console.log('✅ User found:', user._id);
+
+    // Find worker profile
+    const worker = await Worker.findOne({ userId: user._id });
+    
+    if (!worker) {
+      console.error('❌ Worker profile not found for userId:', user._id);
+      return res.status(404).json({
+        success: false,
+        message: 'Worker profile not found. Please complete your worker registration.'
+      });
+    }
+
+    console.log('✅ Worker profile found:', {
+      workerId: worker._id,
+      serviceCategories: worker.serviceCategories,
+      specializations: worker.specializations,
+      experience: worker.experience,
+      hourlyRate: worker.hourlyRate
+    });
+
+    // Return worker data
+    res.status(200).json({
+      success: true,
+      data: worker
+    });
+    
+  } catch (error) {
+    console.error('❌ Error in getWorkerProfile:', error);
+    next(error);
+  }
+};
+
+/**
  * @desc    Search workers with filters
  * @route   GET /api/workers/search
  * @access  Public

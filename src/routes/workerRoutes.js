@@ -31,9 +31,27 @@ router.get(
 );
 
 /**
+ * ✅ NEW ROUTE - Get current worker's profile
+ * @route   GET /api/v1/workers/profile
+ * @desc    Get current worker's profile
+ * @access  Private/Worker
+ * 
+ * IMPORTANT: This route MUST come BEFORE the /:id route
+ * Otherwise /:id will match "/profile" and treat "profile" as an ID
+ */
+router.get(
+  '/profile',
+  authMiddleware,
+  roleMiddleware(['worker']),
+  workerController.getWorkerProfile
+);
+
+/**
  * @route   GET /api/workers/:id
  * @desc    Get worker by ID
  * @access  Public
+ * 
+ * IMPORTANT: This dynamic route should come AFTER specific routes like /profile
  */
 router.get('/:id', workerController.getWorkerById);
 
