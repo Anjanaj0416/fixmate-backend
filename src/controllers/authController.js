@@ -15,11 +15,8 @@ const getAdmin = () => {
  * @route   POST /api/auth/register OR POST /api/auth/signup
  * @access  Public
  * 
- * ✅ FIXED: Accepts COMPLETE worker registration data from Worker Registration Flow
+ * ✅ FIXED: Handles orphaned users and includes better error recovery
  */
-// Updated exports.register function in authController.js
-// This replaces the worker profile creation section (around line 200-300)
-
 exports.register = async (req, res, next) => {
   try {
     console.log('\n📨 Registration request received');
@@ -55,15 +52,115 @@ exports.register = async (req, res, next) => {
       });
     }
 
-    // Check if user already exists
+    // ✅ FIXED: Check for existing user and handle orphaned profiles
     let existingUser = await User.findOne({
       $or: [{ email }, { firebaseUid }]
     });
 
     if (existingUser) {
+      console.log('⚠️  User already exists, checking for orphaned profile...');
+      
+      // Check if role-specific profile exists
+      if (existingUser.role === 'customer') {
+        const existingCustomer = await Customer.findOne({ userId: existingUser._id });
+        
+        if (!existingCustomer) {
+          console.log('🔧 Found orphaned user (no customer profile), completing registration...');
+          
+          // Create the missing customer profile
+          const customerProfile = await Customer.create({
+            userId: existingUser._id,
+            firebaseUid: existingUser.firebaseUid,
+            preferredPaymentMethod: 'cash',
+            savedAddresses: []
+          });
+
+          console.log('✅ Customer profile created for orphaned user:', customerProfile._id);
+
+          return res.status(201).json({
+            success: true,
+            message: 'Customer registration completed successfully',
+            data: {
+              user: {
+                id: existingUser._id,
+                email: existingUser.email,
+                fullName: existingUser.fullName,
+                role: existingUser.role,
+                firebaseUid: existingUser.firebaseUid
+              },
+              customer: {
+                id: customerProfile._id
+              }
+            }
+          });
+        }
+      } else if (existingUser.role === 'worker') {
+        const existingWorker = await Worker.findOne({ userId: existingUser._id });
+        
+        if (!existingWorker) {
+          console.log('🔧 Found orphaned user (no worker profile), completing registration...');
+          
+          // Create the missing worker profile
+          const workerProfile = await Worker.create({
+            userId: existingUser._id,
+            firebaseUid: existingUser.firebaseUid,
+            serviceCategories: serviceCategories || [],
+            specializations: specializations || [],
+            experience: experience || 0,
+            hourlyRate: hourlyRate || 0,
+            skills: skills || [],
+            bio: bio || '',
+            serviceLocations: serviceLocations || [],
+            availability: availability !== false,
+            workingHours: workingHours || {
+              monday: { start: '08:00', end: '18:00', available: true },
+              tuesday: { start: '08:00', end: '18:00', available: true },
+              wednesday: { start: '08:00', end: '18:00', available: true },
+              thursday: { start: '08:00', end: '18:00', available: true },
+              friday: { start: '08:00', end: '18:00', available: true },
+              saturday: { start: '08:00', end: '18:00', available: false },
+              sunday: { start: '08:00', end: '18:00', available: false }
+            },
+            profileStatus: 'active',
+            rating: { average: 0, count: 0 },
+            completedJobs: 0,
+            totalEarnings: 0,
+            responseTime: 0,
+            acceptanceRate: 0,
+            isVerified: false
+          });
+
+          console.log('✅ Worker profile created for orphaned user:', workerProfile._id);
+
+          return res.status(201).json({
+            success: true,
+            message: 'Worker registration completed successfully',
+            data: {
+              user: {
+                id: existingUser._id,
+                email: existingUser.email,
+                fullName: existingUser.fullName,
+                role: existingUser.role,
+                firebaseUid: existingUser.firebaseUid
+              },
+              worker: {
+                id: workerProfile._id,
+                serviceCategories: workerProfile.serviceCategories,
+                specializations: workerProfile.specializations,
+                experience: workerProfile.experience,
+                hourlyRate: workerProfile.hourlyRate,
+                profileStatus: workerProfile.profileStatus
+              }
+            }
+          });
+        }
+      }
+
+      // User and profile both exist
+      console.log('❌ User already exists with complete profile');
       return res.status(400).json({
         success: false,
-        message: 'User already exists'
+        message: 'This account already exists. Please login instead.'
       });
     }
 
@@ -88,34 +185,17 @@ exports.register = async (req, res, next) => {
       console.log('🔧 Creating worker profile with complete data...');
 
       try {
-        // ✅ FIXED: Create worker profile with corrected field mapping
         const workerProfile = await Worker.create({
           userId: newUser._id,
           firebaseUid: newUser.firebaseUid,
-
-          // ✅ Service categories (enum-based, required)
           serviceCategories: serviceCategories || [],
-
-          // ✅ Detailed specializations (flexible strings)
           specializations: specializations || [],
-
-          // Professional info
           experience: experience || 0,
           hourlyRate: hourlyRate || 0,
-
-          // Skills (languages, etc.)
           skills: skills || [],
-
-          // Bio
           bio: bio || '',
-
-          // Service area
           serviceLocations: serviceLocations || [],
-
-          // Availability
           availability: availability !== false,
-
-          // ✅ Working hours (ensure all days are present)
           workingHours: workingHours || {
             monday: { start: '08:00', end: '18:00', available: true },
             tuesday: { start: '08:00', end: '18:00', available: true },
@@ -125,36 +205,17 @@ exports.register = async (req, res, next) => {
             saturday: { start: '08:00', end: '18:00', available: false },
             sunday: { start: '08:00', end: '18:00', available: false }
           },
-
-          // Set profile as active since registration is complete
           profileStatus: 'active',
-
-          // Initialize rating
-          rating: {
-            average: 0,
-            count: 0
-          },
-
-          // Initialize statistics
+          rating: { average: 0, count: 0 },
           completedJobs: 0,
           totalEarnings: 0,
           responseTime: 0,
           acceptanceRate: 0,
-
-          // Verification
           isVerified: false
         });
 
         console.log('✅ Worker profile created successfully:', workerProfile._id);
-        console.log('Worker data:', {
-          serviceCategories: workerProfile.serviceCategories,
-          specializations: workerProfile.specializations,
-          experience: workerProfile.experience,
-          hourlyRate: workerProfile.hourlyRate,
-          profileStatus: workerProfile.profileStatus
-        });
 
-        // Return success response with both user and worker data
         return res.status(201).json({
           success: true,
           message: 'Worker registered successfully',
@@ -183,7 +244,6 @@ exports.register = async (req, res, next) => {
         // If worker creation fails, delete the user
         await User.findByIdAndDelete(newUser._id);
 
-        // Return detailed validation error
         if (workerError.name === 'ValidationError') {
           const errors = {};
           for (let field in workerError.errors) {
@@ -209,39 +269,50 @@ exports.register = async (req, res, next) => {
       }
     }
 
-    // Handle customer registration
+    // ✅ FIXED: Handle customer registration with proper error recovery
     if (role === 'customer') {
       console.log('👤 Creating customer profile...');
 
-      const customerProfile = await Customer.create({
-        userId: newUser._id,
-        firebaseUid: newUser.firebaseUid,
-        preferredPaymentMethod: 'cash',
-        savedAddresses: address ? [{
-          label: 'Home',
-          address: address,
-          isDefault: true
-        }] : []
-      });
+      try {
+        const customerProfile = await Customer.create({
+          userId: newUser._id,
+          firebaseUid: newUser.firebaseUid,
+          preferredPaymentMethod: 'cash',
+          savedAddresses: []  // ✅ Empty array - customers add addresses later
+        });
 
-      console.log('✅ Customer profile created:', customerProfile._id);
+        console.log('✅ Customer profile created:', customerProfile._id);
 
-      return res.status(201).json({
-        success: true,
-        message: 'Customer registered successfully',
-        data: {
-          user: {
-            id: newUser._id,
-            email: newUser.email,
-            fullName: newUser.fullName,
-            role: newUser.role,
-            firebaseUid: newUser.firebaseUid
-          },
-          customer: {
-            id: customerProfile._id
+        return res.status(201).json({
+          success: true,
+          message: 'Customer registered successfully',
+          data: {
+            user: {
+              id: newUser._id,
+              email: newUser.email,
+              fullName: newUser.fullName,
+              role: newUser.role,
+              firebaseUid: newUser.firebaseUid
+            },
+            customer: {
+              id: customerProfile._id
+            }
           }
-        }
-      });
+        });
+
+      } catch (customerError) {
+        console.error('❌ Customer profile creation error:', customerError);
+
+        // ✅ FIXED: If customer creation fails, delete the user to prevent orphaned records
+        await User.findByIdAndDelete(newUser._id);
+
+        // Return detailed error
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to create customer profile',
+          error: customerError.message
+        });
+      }
     }
 
     // If role is neither worker nor customer

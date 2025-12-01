@@ -73,7 +73,8 @@ const customerSchema = new mongoose.Schema({
       },
       coordinates: {
         type: [Number], // [longitude, latitude]
-        required: true
+        required: false,  // ✅ FIXED: Made optional to prevent empty array errors
+        default: undefined  // ✅ FIXED: Undefined prevents geospatial index errors
       }
     },
     isDefault: {
@@ -134,7 +135,14 @@ const customerSchema = new mongoose.Schema({
 
 // Indexes
 // NOTE: userId and firebaseUid already have unique: true which creates indexes
-customerSchema.index({ 'savedAddresses.coordinates': '2dsphere' });
+
+// ✅ FIXED: Added sparse option to geospatial index
+// This allows documents without coordinates to be saved without errors
+customerSchema.index({ 
+  'savedAddresses.coordinates': '2dsphere' 
+}, { 
+  sparse: true  // ✅ Only indexes documents that have coordinates field
+});
 
 // Methods
 customerSchema.methods.addFavoriteWorker = async function(workerId) {
