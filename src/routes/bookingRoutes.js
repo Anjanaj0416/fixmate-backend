@@ -5,8 +5,63 @@ const { authMiddleware } = require('../middleware/authMiddleware');
 const { roleMiddleware } = require('../middleware/roleMiddleware');
 const { validateRequest } = require('../middleware/validator');
 
+// ============================================
+// IMPORTANT: SPECIFIC ROUTES MUST COME FIRST
+// Place routes with specific paths BEFORE routes with :id parameters
+// ============================================
+
 /**
- * @route   POST /api/bookings
+ * @route   POST /api/v1/bookings/quote-request
+ * @desc    Create a new quote request
+ * @access  Private/Customer
+ */
+router.post(
+  '/quote-request',
+  authMiddleware,
+  roleMiddleware(['customer']),
+  bookingController.createQuoteRequest
+);
+
+/**
+ * @route   GET /api/v1/bookings/my-quotes
+ * @desc    Get customer's quote requests
+ * @access  Private/Customer
+ */
+router.get(
+  '/my-quotes',
+  authMiddleware,
+  roleMiddleware(['customer']),
+  bookingController.getCustomerQuoteRequests
+);
+
+/**
+ * @route   GET /api/v1/bookings/received-quotes
+ * @desc    Get worker's received quote requests
+ * @access  Private/Worker
+ */
+router.get(
+  '/received-quotes',
+  authMiddleware,
+  roleMiddleware(['worker']),
+  bookingController.getWorkerReceivedQuotes
+);
+
+/**
+ * @route   GET /api/v1/bookings/stats
+ * @desc    Get booking statistics
+ * @access  Private
+ */
+router.get('/stats', authMiddleware, bookingController.getBookingStats);
+
+/**
+ * @route   GET /api/v1/bookings
+ * @desc    Get all bookings (with filters)
+ * @access  Private
+ */
+router.get('/', authMiddleware, bookingController.getBookings);
+
+/**
+ * @route   POST /api/v1/bookings
  * @desc    Create a new booking
  * @access  Private/Customer
  */
@@ -24,78 +79,37 @@ router.post(
   bookingController.createBooking
 );
 
-/**
- * @route   GET /api/bookings
- * @desc    Get all bookings (with filters)
- * @access  Private
- */
-router.get('/', authMiddleware, bookingController.getBookings);
+// ============================================
+// ROUTES WITH :id PARAMETER - MUST BE LAST
+// These routes should come AFTER all specific routes
+// ============================================
 
 /**
- * @route   GET /api/bookings/stats
- * @desc    Get booking statistics
- * @access  Private
+ * @route   POST /api/v1/bookings/:id/send-to-workers
+ * @desc    Send quote request to selected workers
+ * @access  Private/Customer
  */
-router.get('/stats', authMiddleware, bookingController.getBookingStats);
-
-/**
- * @route   GET /api/bookings/:id
- * @desc    Get booking by ID
- * @access  Private
- */
-router.get('/:id', authMiddleware, bookingController.getBookingById);
-
-/**
- * @route   PUT /api/bookings/:id/status
- * @desc    Update booking status
- * @access  Private
- */
-router.put(
-  '/:id/status',
+router.post(
+  '/:id/send-to-workers',
   authMiddleware,
-  validateRequest(['body.status']),
-  bookingController.updateBookingStatus
+  roleMiddleware(['customer']),
+  bookingController.sendQuoteToWorkers
 );
 
 /**
- * @route   PUT /api/bookings/:id/accept
- * @desc    Worker accepts booking
+ * @route   PUT /api/v1/bookings/:id/respond
+ * @desc    Worker responds to quote request (accept/decline)
  * @access  Private/Worker
  */
 router.put(
-  '/:id/accept',
+  '/:id/respond',
   authMiddleware,
   roleMiddleware(['worker']),
-  bookingController.acceptBooking
+  bookingController.respondToQuoteRequest
 );
 
 /**
- * @route   PUT /api/bookings/:id/decline
- * @desc    Worker declines booking
- * @access  Private/Worker
- */
-router.put(
-  '/:id/decline',
-  authMiddleware,
-  roleMiddleware(['worker']),
-  validateRequest(['body.reason']),
-  bookingController.declineBooking
-);
-
-/**
- * @route   PUT /api/bookings/:id/cancel
- * @desc    Cancel booking
- * @access  Private
- */
-router.put(
-  '/:id/cancel',
-  authMiddleware,
-  validateRequest(['body.reason']),
-  bookingController.cancelBooking
-);
-
-/**
- * @route   POST /api/bookings/:id/quote
+ * @route   POST /api/v1/bookings/:id/quote
  * @desc    Create quote for booking
  * @access  Private/Worker
  */
@@ -112,7 +126,7 @@ router.post(
 );
 
 /**
- * @route   POST /api/bookings/:id/progress
+ * @route   POST /api/v1/bookings/:id/progress
  * @desc    Update work progress
  * @access  Private/Worker
  */
@@ -123,5 +137,61 @@ router.post(
   validateRequest(['body.status', 'body.note']),
   bookingController.updateWorkProgress
 );
+
+/**
+ * @route   PUT /api/v1/bookings/:id/accept
+ * @desc    Worker accepts booking
+ * @access  Private/Worker
+ */
+router.put(
+  '/:id/accept',
+  authMiddleware,
+  roleMiddleware(['worker']),
+  bookingController.acceptBooking
+);
+
+/**
+ * @route   PUT /api/v1/bookings/:id/decline
+ * @desc    Worker declines booking
+ * @access  Private/Worker
+ */
+router.put(
+  '/:id/decline',
+  authMiddleware,
+  roleMiddleware(['worker']),
+  validateRequest(['body.reason']),
+  bookingController.declineBooking
+);
+
+/**
+ * @route   PUT /api/v1/bookings/:id/cancel
+ * @desc    Cancel booking
+ * @access  Private
+ */
+router.put(
+  '/:id/cancel',
+  authMiddleware,
+  validateRequest(['body.reason']),
+  bookingController.cancelBooking
+);
+
+/**
+ * @route   PUT /api/v1/bookings/:id/status
+ * @desc    Update booking status
+ * @access  Private
+ */
+router.put(
+  '/:id/status',
+  authMiddleware,
+  validateRequest(['body.status']),
+  bookingController.updateBookingStatus
+);
+
+/**
+ * @route   GET /api/v1/bookings/:id
+ * @desc    Get booking by ID
+ * @access  Private
+ */
+router.get('/:id', authMiddleware, bookingController.getBookingById);
 
 module.exports = router;

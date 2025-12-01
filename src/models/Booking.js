@@ -175,6 +175,38 @@ const bookingSchema = new mongoose.Schema({
     paidAt: Date,
     amount: Number
   },
+    issueLocation: {
+    type: String,
+    enum: ['Kitchen', 'Bathroom', 'Living room', 'Bedroom', 'Garage', 'Basement', 'Outdoor area', 'Other']
+  },
+  
+  customerBudget: {
+    min: Number,
+    max: Number
+  },
+  
+  urgency: {
+    type: String,
+    enum: ['normal', 'urgent', 'emergency'],
+    default: 'normal'
+  },
+  
+  quoteRequestId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Booking'
+  },
+  
+  sentToWorkers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Worker'
+  }],
+  
+  quote: {
+    amount: Number,
+    details: String,
+    createdAt: Date,
+    validUntil: Date
+  },
   
   // Work Progress
   workProgress: [{
