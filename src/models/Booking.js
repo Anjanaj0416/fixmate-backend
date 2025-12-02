@@ -6,14 +6,11 @@ const bookingSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
-    // NOTE: Removed index: true - it's included in compound index below
   },
   
   workerId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-    // NOTE: Removed index: true - it's included in compound index below
+    ref: 'User'
   },
   
   // Service Details
@@ -46,49 +43,30 @@ const bookingSchema = new mongoose.Schema({
     maxlength: 1000
   },
   
-  // AI Analysis (if image was uploaded)
+  // ✅ FIXED: Simplified problemImages to accept array of strings (base64 or URLs)
   problemImages: [{
-    imageUrl: String, // URL or base64
-    aiAnalysis: {
-      detectedProblem: String,
-      confidence: Number,
-      suggestedService: String,
-      estimatedCost: {
-        min: Number,
-        max: Number
-      },
-      urgency: {
-        type: String,
-        enum: ['low', 'medium', 'high', 'critical']
-      }
-    },
-    uploadedAt: {
-      type: Date,
-      default: Date.now
-    }
+    type: String // Can be base64 or URL
   }],
   
-  // Location
+  // Location Details
+  issueLocation: {
+    type: String,
+    enum: ['Kitchen', 'Bathroom', 'Living room', 'Bedroom', 'Garage', 'Basement', 'Outdoor area', 'Other']
+  },
+  
+  // Service Location
   serviceLocation: {
-    address: {
-      type: String,
-      required: true
-    },
+    address: String,
     city: String,
     district: String,
     coordinates: {
-      type: {
-        type: String,
-        enum: ['Point'],
-        default: 'Point'
-      },
-      coordinates: {
-        type: [Number], // [longitude, latitude]
-        required: true
-      }
-    },
-    accessInstructions: String // e.g., "Gate code: 1234"
+      latitude: Number,
+      longitude: Number
+    }
   },
+  
+  // Contact Information
+  contactPhone: String,
   
   // Scheduling
   scheduledDate: {
@@ -98,63 +76,48 @@ const bookingSchema = new mongoose.Schema({
   
   preferredTimeSlot: {
     type: String,
-    enum: ['morning', 'afternoon', 'evening', 'anytime'],
-    default: 'anytime'
+    enum: ['morning', 'afternoon', 'evening', 'flexible']
   },
   
-  estimatedDuration: {
-    type: Number, // in hours
-    default: null
-  },
-  
-  // Pricing
+  // Budget
   customerBudget: {
-    type: Number,
-    min: 0
+    min: Number,
+    max: Number
   },
   
   quotedPrice: {
     type: Number,
-    default: null
+    min: 0
   },
   
   finalPrice: {
     type: Number,
-    default: null
+    min: 0
+  },
+  
+  // Urgency - ✅ FIXED: Matching frontend values
+  urgency: {
+    type: String,
+    enum: ['low', 'normal', 'high', 'emergency'],
+    default: 'normal'
   },
   
   // Booking Status
   status: {
     type: String,
     enum: [
-      'pending',        // Customer created booking
-      'quote-requested', // Customer requested quote
-      'quoted',         // Worker provided quote
-      'accepted',       // Worker accepted booking
-      'in-progress',    // Work started
-      'completed',      // Work completed
-      'cancelled',      // Cancelled by either party
-      'disputed'        // Under dispute
+      'quote_requested',  // Customer created quote request
+      'quotes_sent',      // Sent to workers
+      'pending',          // Waiting for worker response
+      'accepted',         // Worker accepted
+      'declined',         // Worker declined
+      'in-progress',      // Work in progress
+      'completed',        // Work completed
+      'cancelled',        // Booking cancelled
+      'disputed'          // Dispute raised
     ],
     default: 'pending',
     index: true
-  },
-  
-  // Quote Details (if quote was requested)
-  quote: {
-    amount: Number,
-    breakdown: [{
-      item: String,
-      cost: Number
-    }],
-    validUntil: Date,
-    notes: String,
-    createdAt: Date,
-    status: {
-      type: String,
-      enum: ['pending', 'accepted', 'declined', 'expired'],
-      default: 'pending'
-    }
   },
   
   // Payment
@@ -175,22 +138,8 @@ const bookingSchema = new mongoose.Schema({
     paidAt: Date,
     amount: Number
   },
-    issueLocation: {
-    type: String,
-    enum: ['Kitchen', 'Bathroom', 'Living room', 'Bedroom', 'Garage', 'Basement', 'Outdoor area', 'Other']
-  },
   
-  customerBudget: {
-    min: Number,
-    max: Number
-  },
-  
-  urgency: {
-    type: String,
-    enum: ['normal', 'urgent', 'emergency'],
-    default: 'normal'
-  },
-  
+  // Quote Request Tracking
   quoteRequestId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking'
@@ -201,11 +150,16 @@ const bookingSchema = new mongoose.Schema({
     ref: 'Worker'
   }],
   
+  // Quote Information
   quote: {
     amount: Number,
     details: String,
     createdAt: Date,
-    validUntil: Date
+    validUntil: Date,
+    status: {
+      type: String,
+      enum: ['pending', 'accepted', 'declined']
+    }
   },
   
   // Work Progress
@@ -221,30 +175,19 @@ const bookingSchema = new mongoose.Schema({
   
   // Completion Details
   completedAt: Date,
-  
   workCompletionNotes: String,
-  
   completionImages: [String],
   
   // Cancellation
   cancellationReason: String,
-  
   cancelledBy: {
     type: String,
     enum: ['customer', 'worker', 'admin']
   },
-  
   cancelledAt: Date,
   
   // Special Instructions
   specialInstructions: String,
-  
-  // Urgency
-  urgency: {
-    type: String,
-    enum: ['low', 'medium', 'high', 'emergency'],
-    default: 'medium'
-  },
   
   // Worker Response
   workerResponse: {
@@ -256,6 +199,20 @@ const bookingSchema = new mongoose.Schema({
     },
     declineReason: String
   },
+  
+  // Rating & Review (after completion)
+  rating: {
+    type: Number,
+    min: 1,
+    max: 5
+  },
+  
+  review: {
+    type: String,
+    maxlength: 500
+  },
+  
+  reviewedAt: Date,
   
   // Timestamps
   createdAt: {
@@ -272,11 +229,10 @@ const bookingSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes
+// Indexes for better query performance
 bookingSchema.index({ customerId: 1, createdAt: -1 });
 bookingSchema.index({ workerId: 1, createdAt: -1 });
 bookingSchema.index({ status: 1, scheduledDate: 1 });
-bookingSchema.index({ 'serviceLocation.coordinates': '2dsphere' });
 bookingSchema.index({ serviceType: 1 });
 
 // Methods

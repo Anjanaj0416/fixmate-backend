@@ -2,17 +2,22 @@ const { getAuth } = require('../config/firebase-admin');
 const { User } = require('../models');
 
 /**
- * Authentication Middleware - FIXED VERSION
+ * Authentication Middleware - FIXED & ENHANCED VERSION
  * Verifies Firebase ID token and attaches user info to request
  * 
- * ✅ FIX: Changed from require('admin') to require Firebase from config
+ * ✅ FIXED: Better logging for debugging
+ * ✅ FIXED: Token validation checks
+ * ✅ FIXED: Detailed error messages
  */
 exports.authMiddleware = async (req, res, next) => {
   try {
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
     
+    console.log('🔍 Auth check - Authorization header exists:', !!authHeader);
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ No valid Authorization header');
       return res.status(401).json({
         success: false,
         message: 'No token provided. Please provide a valid Bearer token.'
@@ -22,21 +27,37 @@ exports.authMiddleware = async (req, res, next) => {
     const token = authHeader.split('Bearer ')[1];
 
     if (!token) {
+      console.log('❌ Token extraction failed');
       return res.status(401).json({
         success: false,
         message: 'Invalid token format'
       });
     }
 
-    // ✅ FIX: Get Firebase Auth instance from config
+    // ✅ NEW: Better token validation logging
+    console.log('🔍 Token received (first 30 chars):', token.substring(0, 30) + '...');
+    console.log('🔍 Token length:', token.length);
+
+    // ✅ NEW: Check if token looks valid (Firebase tokens are typically 800+ characters)
+    if (token.length < 100) {
+      console.log('❌ Token too short - likely invalid');
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token format - token too short'
+      });
+    }
+
+    // Get Firebase Auth instance from config
     const auth = getAuth();
 
     // Verify Firebase ID token
     let decodedToken;
     try {
+      console.log('🔐 Verifying token with Firebase...');
       decodedToken = await auth.verifyIdToken(token);
+      console.log('✅ Token verified successfully for user:', decodedToken.email);
     } catch (firebaseError) {
-      console.error('Firebase token verification failed:', firebaseError);
+      console.error('❌ Firebase token verification failed:', firebaseError.message);
       
       // Handle specific Firebase errors
       if (firebaseError.code === 'auth/id-token-expired') {
@@ -55,27 +76,41 @@ exports.authMiddleware = async (req, res, next) => {
         });
       }
       
+      if (firebaseError.code === 'auth/argument-error') {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token format. Please login again.',
+          code: 'INVALID_TOKEN_FORMAT'
+        });
+      }
+      
       return res.status(401).json({
         success: false,
         message: 'Invalid token. Authentication failed.',
-        code: 'INVALID_TOKEN'
+        code: 'INVALID_TOKEN',
+        details: firebaseError.message
       });
     }
 
     // Find user in database
+    console.log('🔍 Looking up user in database...');
     const user = await User.findOne({ firebaseUid: decodedToken.uid }).select(
       'firebaseUid email role accountStatus fullName _id'
     );
 
     if (!user) {
+      console.log('❌ User not found in database:', decodedToken.uid);
       return res.status(404).json({
         success: false,
         message: 'User not found. Please register first.'
       });
     }
 
+    console.log('✅ User found:', user.email, 'Role:', user.role);
+
     // Check if account is active
     if (user.accountStatus === 'suspended') {
+      console.log('❌ Account suspended:', user.email);
       return res.status(403).json({
         success: false,
         message: 'Your account has been suspended. Please contact support.',
@@ -84,6 +119,7 @@ exports.authMiddleware = async (req, res, next) => {
     }
 
     if (user.accountStatus === 'deleted') {
+      console.log('❌ Account deleted:', user.email);
       return res.status(403).json({
         success: false,
         message: 'Your account has been deleted.',
@@ -104,12 +140,14 @@ exports.authMiddleware = async (req, res, next) => {
     // Attach decoded token for additional info if needed
     req.decodedToken = decodedToken;
 
+    console.log('✅ Authentication successful for:', user.email);
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    console.error('❌ Auth middleware error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Authentication failed. Please try again.'
+      message: 'Authentication failed. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -136,7 +174,7 @@ exports.optionalAuthMiddleware = async (req, res, next) => {
       return next();
     }
 
-    // ✅ FIX: Get Firebase Auth instance from config
+    // Get Firebase Auth instance from config
     const auth = getAuth();
 
     // Try to verify token
