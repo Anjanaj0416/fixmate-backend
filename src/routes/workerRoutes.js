@@ -5,11 +5,19 @@ const { authMiddleware } = require('../middleware/authMiddleware');
 const { roleMiddleware } = require('../middleware/roleMiddleware');
 
 /**
- * @route   GET /api/workers
- * @desc    Get all workers with filters
- * @access  Public
+ * ========================================
+ * IMPORTANT: SPECIFIC ROUTES FIRST!
+ * Place routes with specific paths BEFORE routes with :id parameters
+ * ========================================
  */
-router.get('/', workerController.getWorkers);
+
+/**
+ * ✅ NEW ROUTE - Get nearby workers
+ * @route   GET /api/v1/workers/nearby
+ * @desc    Get nearby workers by location and service type
+ * @access  Private
+ */
+router.get('/nearby', authMiddleware, workerController.getNearbyWorkers);
 
 /**
  * @route   GET /api/workers/search
@@ -31,7 +39,6 @@ router.get(
 );
 
 /**
- * ✅ NEW ROUTE - Get current worker's profile
  * @route   GET /api/v1/workers/profile
  * @desc    Get current worker's profile
  * @access  Private/Worker
@@ -47,13 +54,39 @@ router.get(
 );
 
 /**
+ * @route   GET /api/workers
+ * @desc    Get all workers with filters
+ * @access  Public
+ */
+router.get('/', workerController.getWorkers);
+
+/**
+ * ========================================
+ * DYNAMIC ROUTES - MUST BE LAST!
+ * ========================================
+ */
+
+/**
  * @route   GET /api/workers/:id
  * @desc    Get worker by ID
  * @access  Public
  * 
- * IMPORTANT: This dynamic route should come AFTER specific routes like /profile
+ * IMPORTANT: This dynamic route should come AFTER specific routes
  */
 router.get('/:id', workerController.getWorkerById);
+
+/**
+ * @route   GET /api/workers/:id/reviews
+ * @desc    Get worker reviews
+ * @access  Public
+ */
+router.get('/:id/reviews', workerController.getWorkerReviews);
+
+/**
+ * ========================================
+ * UPDATE/CREATE ROUTES
+ * ========================================
+ */
 
 /**
  * @route   PUT /api/workers/profile
@@ -102,13 +135,6 @@ router.put(
   roleMiddleware(['worker']),
   workerController.updateAvailability
 );
-
-/**
- * @route   GET /api/workers/:id/reviews
- * @desc    Get worker reviews
- * @access  Public
- */
-router.get('/:id/reviews', workerController.getWorkerReviews);
 
 /**
  * @route   POST /api/workers/certifications

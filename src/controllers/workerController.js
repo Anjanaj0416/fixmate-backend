@@ -49,6 +49,141 @@ exports.getWorkers = async (req, res, next) => {
 };
 
 /**
+ * ✅ NEW - Get nearby workers filtered by service type and location
+ * @desc    Get nearby workers filtered by service type
+ * @route   GET /api/v1/workers/nearby
+ * @access  Private
+ */
+exports.getNearbyWorkers = async (req, res, next) => {
+  try {
+    const {
+      serviceType,
+      latitude,
+      longitude,
+      maxDistance = 10000, // 10km in meters
+      minRating = 0,
+      sortBy = 'distance', // distance, rating, price
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    console.log('🔍 Finding nearby workers:', {
+      serviceType,
+      location: `${latitude}, ${longitude}`,
+      maxDistance: `${maxDistance}m`,
+    });
+
+    // Validate required fields
+    if (!serviceType || !latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: 'Service type, latitude, and longitude are required',
+      });
+    }
+
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+    const maxDist = parseInt(maxDistance);
+
+    // Build query - serviceCategories should match serviceType
+    const query = {
+      profileStatus: 'active',
+      isAvailable: true,
+      serviceCategories: serviceType, // Match the service type
+    };
+
+    // Add rating filter
+    if (minRating > 0) {
+      query['rating.average'] = { $gte: parseFloat(minRating) };
+    }
+
+    // Find workers with location filter
+    let workers = await Worker.find(query)
+      .populate('userId', 'fullName email phoneNumber profileImage')
+      .lean();
+
+    console.log(`📊 Found ${workers.length} workers with service type ${serviceType}`);
+
+    // Calculate distances and filter by maxDistance
+    workers = workers
+      .map((worker) => {
+        if (!worker.location || !worker.location.coordinates) {
+          return null;
+        }
+
+        const workerLat = worker.location.coordinates[1]; // GeoJSON: [lng, lat]
+        const workerLng = worker.location.coordinates[0];
+
+        const distance = calculateDistance(lat, lng, workerLat, workerLng);
+
+        return {
+          ...worker,
+          distance: Math.round(distance * 10) / 10, // Round to 1 decimal
+        };
+      })
+      .filter((worker) => worker !== null && worker.distance <= maxDist / 1000);
+
+    console.log(`📍 ${workers.length} workers within ${maxDist}m`);
+
+    // Sort workers
+    if (sortBy === 'distance') {
+      workers.sort((a, b) => a.distance - b.distance);
+    } else if (sortBy === 'rating') {
+      workers.sort((a, b) => (b.rating?.average || 0) - (a.rating?.average || 0));
+    } else if (sortBy === 'price') {
+      workers.sort((a, b) => (a.hourlyRate || 999999) - (b.hourlyRate || 999999));
+    }
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedWorkers = workers.slice(skip, skip + parseInt(limit));
+
+    console.log(`✅ Returning ${paginatedWorkers.length} workers`);
+
+    res.status(200).json({
+      success: true,
+      count: paginatedWorkers.length,
+      total: workers.length,
+      page: parseInt(page),
+      pages: Math.ceil(workers.length / parseInt(limit)),
+      workers: paginatedWorkers,
+    });
+
+  } catch (error) {
+    console.error('❌ Error getting nearby workers:', error);
+    next(error);
+  }
+};
+
+/**
+ * Calculate distance between two coordinates (Haversine formula)
+ * @param {number} lat1 - Latitude 1
+ * @param {number} lon1 - Longitude 1
+ * @param {number} lat2 - Latitude 2
+ * @param {number} lon2 - Longitude 2
+ * @returns {number} Distance in kilometers
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth radius in km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in km
+}
+
+function toRad(degrees) {
+  return degrees * (Math.PI / 180);
+}
+
+/**
  * @desc    Get worker by ID
  * @route   GET /api/workers/:id
  * @access  Public
@@ -316,21 +451,16 @@ exports.getWorkerStats = async (req, res, next) => {
 };
 
 /**
- * ✅ COMPLETE FIX - Get current worker's profile WITH USER DATA
- * @desc    Get current worker's profile
+ * @desc    Get current worker's profile WITH USER DATA
  * @route   GET /api/v1/workers/profile
  * @access  Private/Worker
- * 
- * CRITICAL FIX: Added .populate('userId') to include user information
  */
 exports.getWorkerProfile = async (req, res, next) => {
   try {
-    // Get firebaseUid from authenticated user (set by authMiddleware)
     const { firebaseUid } = req.user;
 
     console.log('🔍 Getting worker profile for:', firebaseUid);
 
-    // Find user document
     const user = await User.findOne({ firebaseUid });
 
     if (!user) {
@@ -343,7 +473,6 @@ exports.getWorkerProfile = async (req, res, next) => {
 
     console.log('✅ User found:', user._id);
 
-    // ✅ CRITICAL FIX: Added .populate('userId') to get user details
     const worker = await Worker.findOne({ userId: user._id })
       .populate('userId', 'fullName email phoneNumber profileImage location');
 
@@ -368,7 +497,6 @@ exports.getWorkerProfile = async (req, res, next) => {
       }
     });
 
-    // Return worker data with populated user information
     res.status(200).json({
       success: true,
       data: worker
@@ -564,7 +692,7 @@ exports.updateBankDetails = async (req, res, next) => {
           accountNumber,
           bankName,
           branchName,
-          isVerified: false // Admin needs to verify
+          isVerified: false
         }
       },
       { new: true }
