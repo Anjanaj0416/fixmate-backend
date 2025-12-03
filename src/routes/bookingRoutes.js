@@ -85,17 +85,18 @@ router.post(
 // ============================================
 
 /**
- * @route   POST /api/v1/bookings/:id/send-to-workers
- * @desc    Send quote request to selected workers
+ * @route   POST /api/v1/bookings/:id/send-to-worker
+ * @desc    Send quote request to specific worker
  * @access  Private/Customer
+ * 
+ * ✅ ADD THIS ROUTE AFTER THE /quote-request ROUTE
  */
 router.post(
-  '/:id/send-to-workers',
+  '/:id/send-to-worker',
   authMiddleware,
   roleMiddleware(['customer']),
-  bookingController.sendQuoteToWorkers
+  bookingController.sendQuoteToWorker
 );
-
 /**
  * @route   PUT /api/v1/bookings/:id/respond
  * @desc    Worker responds to quote request (accept/decline)

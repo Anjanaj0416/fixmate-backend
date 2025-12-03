@@ -549,13 +549,16 @@ exports.getBookingStats = async (req, res, next) => {
     next(error);
   }
 };
+// ============================================
+// BOOKING CONTROLLER - UPDATED METHODS
+// Add these methods to your existing bookingController.js
+// ============================================
+
 /**
- * ✅ UPDATED - Create quote request with proper Base64 image handling
+ * ✅ UPDATED - Create quote request with MANUAL LOCATION (no GPS)
  * @desc    Create a new quote request
  * @route   POST /api/v1/bookings/quote-request
  * @access  Private/Customer
- * 
- * REPLACE this function in your bookingController.js starting around line 560
  */
 exports.createQuoteRequest = async (req, res, next) => {
   try {
@@ -568,7 +571,7 @@ exports.createQuoteRequest = async (req, res, next) => {
       urgency,
       budgetRange,
       problemImages, // Array of Base64 image strings
-      customerLocation, // GPS coordinates and address
+      serviceLocation, // ✅ CHANGED: Manual location {town, district, address}
       contactPhone
     } = req.body;
 
@@ -577,7 +580,8 @@ exports.createQuoteRequest = async (req, res, next) => {
       issueLocation,
       budgetRange,
       imageCount: problemImages?.length || 0,
-      hasLocation: !!customerLocation,
+      hasLocation: !!serviceLocation,
+      location: serviceLocation
     });
 
     // Find user
@@ -598,31 +602,27 @@ exports.createQuoteRequest = async (req, res, next) => {
       });
     }
 
-    // ✅ Prepare service location from GPS coordinates
-    let serviceLocation = null;
-    if (customerLocation && customerLocation.coordinates) {
-      serviceLocation = {
-        address: customerLocation.address?.full || 'Location captured',
-        city: customerLocation.address?.city || '',
-        district: customerLocation.address?.district || '',
-        coordinates: {
-          latitude: customerLocation.coordinates.latitude,
-          longitude: customerLocation.coordinates.longitude
-        }
+    // ✅ Prepare service location from manual input
+    let locationData = null;
+    if (serviceLocation) {
+      locationData = {
+        address: serviceLocation.address || `${serviceLocation.town}, ${serviceLocation.district}`,
+        city: serviceLocation.town,
+        district: serviceLocation.district,
+        // ✅ For future: You can add approximate coordinates based on town
+        // For now, coordinates are optional
+        coordinates: serviceLocation.coordinates || null
       };
     }
 
     // ✅ Validate and prepare Base64 images
-    // Images come as Base64 strings from ImageUpload component
     let validatedImages = [];
     if (problemImages && Array.isArray(problemImages)) {
-      // Images can be either simple Base64 strings or objects with {base64: ...}
       validatedImages = problemImages.map((img, index) => {
-        // Handle both formats
         if (typeof img === 'string') {
-          return img; // Already a Base64 string
+          return img;
         } else if (img.base64 || img.data) {
-          return img.base64 || img.data; // Extract Base64 from object
+          return img.base64 || img.data;
         }
         return null;
       }).filter(img => img !== null);
@@ -630,12 +630,18 @@ exports.createQuoteRequest = async (req, res, next) => {
       console.log(`📸 Processing ${validatedImages.length} images`);
     }
 
-    // ✅ Parse budget range if it's a string like "2000-10000"
+    // ✅ Parse budget range
     let parsedBudget = null;
     if (budgetRange) {
-      if (typeof budgetRange === 'string' && budgetRange.includes('-')) {
-        const [min, max] = budgetRange.split('-').map(val => parseInt(val.trim()));
-        parsedBudget = { min, max };
+      if (typeof budgetRange === 'string') {
+        // Handle formats like "1000-3000" or "50000+"
+        if (budgetRange.includes('-')) {
+          const [min, max] = budgetRange.split('-').map(val => parseInt(val.trim()));
+          parsedBudget = { min, max };
+        } else if (budgetRange.includes('+')) {
+          const min = parseInt(budgetRange.replace('+', '').trim());
+          parsedBudget = { min, max: null };
+        }
       } else if (typeof budgetRange === 'object') {
         parsedBudget = budgetRange;
       }
@@ -647,11 +653,11 @@ exports.createQuoteRequest = async (req, res, next) => {
       serviceType,
       problemDescription,
       issueLocation,
-      serviceLocation,
+      serviceLocation: locationData,
       scheduledDate: serviceDate,
       urgency: urgency || 'normal',
       customerBudget: parsedBudget,
-      problemImages: validatedImages, // Array of Base64 strings
+      problemImages: validatedImages,
       contactPhone: contactPhone || user.phoneNumber,
       status: 'quote_requested',
       paymentStatus: 'pending'
@@ -661,26 +667,14 @@ exports.createQuoteRequest = async (req, res, next) => {
       id: quoteRequest._id,
       serviceType: quoteRequest.serviceType,
       images: quoteRequest.problemImages.length,
-      location: quoteRequest.serviceLocation ? 'Yes' : 'No',
-      urgency: quoteRequest.urgency,
-      budgetRange: quoteRequest.customerBudget
+      location: quoteRequest.serviceLocation ? `${quoteRequest.serviceLocation.city}, ${quoteRequest.serviceLocation.district}` : 'No location'
     });
 
     res.status(201).json({
       success: true,
       message: 'Quote request created successfully',
-      quoteRequest: {
-        _id: quoteRequest._id,
-        serviceType: quoteRequest.serviceType,
-        problemDescription: quoteRequest.problemDescription,
-        issueLocation: quoteRequest.issueLocation,
-        scheduledDate: quoteRequest.scheduledDate,
-        urgency: quoteRequest.urgency,
-        customerBudget: quoteRequest.customerBudget,
-        status: quoteRequest.status,
-        imageCount: quoteRequest.problemImages.length,
-        hasLocation: !!quoteRequest.serviceLocation,
-        createdAt: quoteRequest.createdAt,
+      data: {
+        quoteRequest
       }
     });
 
@@ -689,27 +683,43 @@ exports.createQuoteRequest = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
- * @desc    Send quote request to selected workers
- * @route   POST /api/v1/bookings/:id/send-to-workers
+ * ✅ NEW - Send quote request to specific worker
+ * @desc    Send a quote request to a specific worker
+ * @route   POST /api/v1/bookings/:id/send-to-worker
  * @access  Private/Customer
  */
-exports.sendQuoteToWorkers = async (req, res, next) => {
+exports.sendQuoteToWorker = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { workerIds } = req.body;
     const { firebaseUid } = req.user;
+    const { id: quoteRequestId } = req.params;
+    const { workerId } = req.body;
 
-    if (!workerIds || workerIds.length === 0) {
+    console.log('📤 Sending quote to worker:', {
+      quoteRequestId,
+      workerId
+    });
+
+    // Validate inputs
+    if (!workerId) {
       return res.status(400).json({
         success: false,
-        message: 'Please select at least one worker'
+        message: 'Worker ID is required'
+      });
+    }
+
+    // Find user
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
     }
 
     // Find quote request
-    const quoteRequest = await Booking.findById(id).populate('customerId', 'fullName email');
-
+    const quoteRequest = await Booking.findById(quoteRequestId);
     if (!quoteRequest) {
       return res.status(404).json({
         success: false,
@@ -717,93 +727,101 @@ exports.sendQuoteToWorkers = async (req, res, next) => {
       });
     }
 
-    // Verify customer owns this quote request
-    const user = await User.findOne({ firebaseUid });
-    if (quoteRequest.customerId._id.toString() !== user._id.toString()) {
+    // Verify ownership
+    if (quoteRequest.customerId.toString() !== user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized access'
+        message: 'You do not have permission to send this quote request'
       });
     }
 
-    // Create separate booking for each worker
-    const bookings = [];
-    const notifications = [];
-
-    for (const workerId of workerIds) {
-      // Create a copy of the quote request for this worker
-      const booking = await Booking.create({
-        customerId: quoteRequest.customerId._id,
-        workerId,
-        serviceType: quoteRequest.serviceType,
-        problemDescription: quoteRequest.problemDescription,
-        issueLocation: quoteRequest.issueLocation,
-        serviceLocation: quoteRequest.serviceLocation,
-        scheduledDate: quoteRequest.scheduledDate,
-        urgency: quoteRequest.urgency,
-        customerBudget: quoteRequest.customerBudget,
-        problemImages: quoteRequest.problemImages,
-        contactPhone: quoteRequest.contactPhone,
-        status: 'pending', // Worker needs to respond
-        paymentStatus: 'pending',
-        quoteRequestId: quoteRequest._id
+    // Find worker
+    const worker = await Worker.findById(workerId);
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker not found'
       });
-
-      bookings.push(booking);
-
-      // Create notification for worker
-      const notification = await Notification.create({
-        userId: workerId,
-        type: 'booking-received',
-        title: 'New Quote Request',
-        message: `You have received a new quote request for ${quoteRequest.serviceType}`,
-        relatedBooking: booking._id,
-        relatedUser: user._id
-      });
-
-      notifications.push(notification);
     }
 
-    // Update original quote request status
-    quoteRequest.status = 'quotes_sent';
-    quoteRequest.sentToWorkers = workerIds;
+    // Check if already sent to this worker
+    const alreadySent = quoteRequest.sentToWorkers?.some(
+      w => w.toString() === workerId
+    );
+
+    if (alreadySent) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quote request already sent to this worker'
+      });
+    }
+
+    // ✅ Update quote request: add worker to sentToWorkers array
+    quoteRequest.sentToWorkers = quoteRequest.sentToWorkers || [];
+    quoteRequest.sentToWorkers.push(workerId);
     await quoteRequest.save();
 
-    // Update customer stats
-    const customerProfile = await Customer.findOne({ userId: user._id });
-    if (customerProfile) {
-      await customerProfile.incrementBookings();
+    // ✅ Create notification for worker
+    try {
+      const workerUser = await User.findById(worker.userId);
+      
+      // Send push notification if FCM token exists
+      if (workerUser && workerUser.fcmToken) {
+        const notificationPayload = {
+          notification: {
+            title: '🔔 New Quote Request',
+            body: `New ${quoteRequest.serviceType} request in ${quoteRequest.serviceLocation?.city || 'your area'}`
+          },
+          data: {
+            type: 'new_quote',
+            bookingId: quoteRequestId,
+            serviceType: quoteRequest.serviceType,
+            location: JSON.stringify(quoteRequest.serviceLocation)
+          }
+        };
+
+        await admin.messaging().send({
+          ...notificationPayload,
+          token: workerUser.fcmToken
+        });
+
+        console.log('✅ Push notification sent to worker');
+      }
+    } catch (notifError) {
+      console.warn('⚠️  Could not send notification:', notifError.message);
+      // Don't fail the request if notification fails
     }
 
-    console.log('✅ Quote requests sent:', {
-      quoteRequestId: quoteRequest._id,
-      workersCount: workerIds.length,
-      bookingIds: bookings.map(b => b._id)
-    });
+    console.log('✅ Quote sent successfully to worker');
 
     res.status(200).json({
       success: true,
-      message: `Quote request sent to ${workerIds.length} worker(s)`,
-      bookings,
-      quoteRequest
+      message: 'Quote request sent to worker successfully',
+      data: {
+        quoteRequest: {
+          id: quoteRequest._id,
+          sentToWorkers: quoteRequest.sentToWorkers.length
+        }
+      }
     });
 
   } catch (error) {
-    console.error('❌ Error sending quote to workers:', error);
+    console.error('❌ Error sending quote to worker:', error);
     next(error);
   }
 };
 
 /**
- * @desc    Get customer's quote requests
+ * ✅ UPDATED - Get customer's quote requests (with sentToWorkers info)
+ * @desc    Get all quote requests for a customer
  * @route   GET /api/v1/bookings/my-quotes
  * @access  Private/Customer
  */
 exports.getCustomerQuoteRequests = async (req, res, next) => {
   try {
     const { firebaseUid } = req.user;
-    const { page = 1, limit = 20, status } = req.query;
 
+    // Find user
     const user = await User.findOne({ firebaseUid });
     if (!user) {
       return res.status(404).json({
@@ -812,76 +830,46 @@ exports.getCustomerQuoteRequests = async (req, res, next) => {
       });
     }
 
-    const query = { customerId: user._id };
-
-    // Filter by status if provided
-    if (status) {
-      query.status = status;
-    } else {
-      // By default, show quote-related statuses
-      query.status = {
-        $in: ['quote_requested', 'quotes_sent', 'pending', 'accepted', 'declined']
-      };
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const quoteRequests = await Booking.find(query)
-      .populate('workerId', 'userId serviceCategories specializations rating hourlyRate location')
+    // Get all quote requests for this customer
+    const quoteRequests = await Booking.find({
+      customerId: user._id,
+      status: { $in: ['quote_requested', 'pending', 'accepted', 'in-progress', 'completed', 'cancelled'] }
+    })
+      .populate('sentToWorkers', 'userId')
       .populate({
-        path: 'workerId',
+        path: 'sentToWorkers',
         populate: {
           path: 'userId',
-          select: 'fullName email phoneNumber profileImage'
+          select: 'fullName profileImage'
         }
       })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Booking.countDocuments(query);
-
-    // Group quotes by original request
-    const groupedQuotes = {};
-    quoteRequests.forEach(quote => {
-      const requestId = quote.quoteRequestId || quote._id;
-      if (!groupedQuotes[requestId]) {
-        groupedQuotes[requestId] = {
-          requestInfo: quote,
-          responses: []
-        };
-      }
-      if (quote.workerId) {
-        groupedQuotes[requestId].responses.push(quote);
-      }
-    });
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
-      count: quoteRequests.length,
-      total,
-      pages: Math.ceil(total / parseInt(limit)),
-      currentPage: parseInt(page),
-      quoteRequests,
-      groupedQuotes
+      data: {
+        count: quoteRequests.length,
+        quoteRequests
+      }
     });
 
   } catch (error) {
-    console.error('❌ Error fetching quote requests:', error);
+    console.error('❌ Error fetching customer quotes:', error);
     next(error);
   }
 };
 
 /**
- * @desc    Get worker's received quote requests
+ * ✅ NEW - Get worker's received quote requests
+ * @desc    Get all quote requests sent to a worker
  * @route   GET /api/v1/bookings/received-quotes
  * @access  Private/Worker
  */
 exports.getWorkerReceivedQuotes = async (req, res, next) => {
   try {
     const { firebaseUid } = req.user;
-    const { page = 1, limit = 20, status } = req.query;
 
+    // Find user
     const user = await User.findOne({ firebaseUid });
     if (!user) {
       return res.status(404).json({
@@ -890,6 +878,7 @@ exports.getWorkerReceivedQuotes = async (req, res, next) => {
       });
     }
 
+    // Find worker profile
     const worker = await Worker.findOne({ userId: user._id });
     if (!worker) {
       return res.status(404).json({
@@ -898,28 +887,20 @@ exports.getWorkerReceivedQuotes = async (req, res, next) => {
       });
     }
 
-    const query = {
-      workerId: worker._id,
-      status: status || { $in: ['pending', 'accepted', 'declined'] }
-    };
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const receivedQuotes = await Booking.find(query)
-      .populate('customerId', 'fullName email phoneNumber profileImage location')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Booking.countDocuments(query);
+    // Get all quote requests sent to this worker
+    const receivedQuotes = await Booking.find({
+      sentToWorkers: worker._id,
+      status: { $in: ['quote_requested', 'pending', 'accepted'] }
+    })
+      .populate('customerId', 'fullName phoneNumber profileImage')
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
-      count: receivedQuotes.length,
-      total,
-      pages: Math.ceil(total / parseInt(limit)),
-      currentPage: parseInt(page),
-      receivedQuotes
+      data: {
+        count: receivedQuotes.length,
+        receivedQuotes
+      }
     });
 
   } catch (error) {
@@ -927,6 +908,8 @@ exports.getWorkerReceivedQuotes = async (req, res, next) => {
     next(error);
   }
 };
+
+
 
 /**
  * @desc    Worker responds to quote request (accept/decline)

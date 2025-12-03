@@ -20,11 +20,16 @@ const { roleMiddleware } = require('../middleware/roleMiddleware');
 router.get('/nearby', authMiddleware, workerController.getNearbyWorkers);
 
 /**
- * @route   GET /api/workers/search
- * @desc    Search workers with advanced filters
- * @access  Public
+ * @route   GET /api/v1/workers/search
+ * @desc    Search workers by service type and location
+ * @access  Public/Private
+ * 
+ * ✅ ADD THIS ROUTE BEFORE ANY /:id ROUTES
  */
-router.get('/search', workerController.searchWorkers);
+router.get(
+  '/search',
+  workerController.searchWorkers
+);
 
 /**
  * @route   GET /api/workers/stats
@@ -98,6 +103,17 @@ router.put(
   authMiddleware,
   roleMiddleware(['worker']),
   workerController.updateWorkerProfile
+);
+/**
+ * @route   GET /api/v1/workers/:id/profile
+ * @desc    Get worker profile (for customers to view)
+ * @access  Public/Private
+ * 
+ * ✅ ADD THIS ROUTE
+ */
+router.get(
+  '/:id/profile',
+  workerController.getWorkerProfile
 );
 
 /**

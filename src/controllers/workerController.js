@@ -1,52 +1,6 @@
 const { Worker, User, Review, Booking } = require('../models');
 
-/**
- * @desc    Get all workers with filters
- * @route   GET /api/workers
- * @access  Public
- */
-exports.getWorkers = async (req, res, next) => {
-  try {
-    const {
-      specialization,
-      city,
-      district,
-      minRating,
-      maxRate,
-      availability,
-      page = 1,
-      limit = 20,
-      sortBy = 'rating.average'
-    } = req.query;
 
-    const query = { profileStatus: 'active' };
-
-    if (specialization) query.specializations = specialization;
-    if (availability) query.availability = availability === 'true';
-    if (minRating) query['rating.average'] = { $gte: parseFloat(minRating) };
-    if (maxRate) query.hourlyRate = { $lte: parseFloat(maxRate) };
-
-    const workers = await Worker.find(query)
-      .populate('userId', 'fullName email phoneNumber profileImage location')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ [sortBy]: -1 });
-
-    const count = await Worker.countDocuments(query);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        workers,
-        totalPages: Math.ceil(count / limit),
-        currentPage: page,
-        total: count
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
 /**
  * ✅ NEW - Get nearby workers filtered by service type and location
@@ -450,147 +404,7 @@ exports.getWorkerStats = async (req, res, next) => {
   }
 };
 
-/**
- * @desc    Get current worker's profile WITH USER DATA
- * @route   GET /api/v1/workers/profile
- * @access  Private/Worker
- */
-exports.getWorkerProfile = async (req, res, next) => {
-  try {
-    const { firebaseUid } = req.user;
 
-    console.log('🔍 Getting worker profile for:', firebaseUid);
-
-    const user = await User.findOne({ firebaseUid });
-
-    if (!user) {
-      console.error('❌ User not found for firebaseUid:', firebaseUid);
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    console.log('✅ User found:', user._id);
-
-    const worker = await Worker.findOne({ userId: user._id })
-      .populate('userId', 'fullName email phoneNumber profileImage location');
-
-    if (!worker) {
-      console.error('❌ Worker profile not found for userId:', user._id);
-      return res.status(404).json({
-        success: false,
-        message: 'Worker profile not found. Please complete your worker registration.'
-      });
-    }
-
-    console.log('✅ Worker profile found with user data:', {
-      workerId: worker._id,
-      serviceCategories: worker.serviceCategories,
-      specializations: worker.specializations,
-      experience: worker.experience,
-      hourlyRate: worker.hourlyRate,
-      userId: {
-        fullName: worker.userId.fullName,
-        email: worker.userId.email,
-        phoneNumber: worker.userId.phoneNumber
-      }
-    });
-
-    res.status(200).json({
-      success: true,
-      data: worker
-    });
-
-  } catch (error) {
-    console.error('❌ Error in getWorkerProfile:', error);
-    next(error);
-  }
-};
-
-/**
- * @desc    Search workers with filters
- * @route   GET /api/workers/search
- * @access  Public
- */
-exports.searchWorkers = async (req, res, next) => {
-  try {
-    const {
-      query,
-      specialization,
-      longitude,
-      latitude,
-      maxDistance = 10000,
-      minRating,
-      page = 1,
-      limit = 20
-    } = req.query;
-
-    const searchQuery = { profileStatus: 'active' };
-
-    // Text search
-    if (query) {
-      const users = await User.find({
-        $or: [
-          { fullName: { $regex: query, $options: 'i' } },
-          { 'location.city': { $regex: query, $options: 'i' } },
-          { 'location.district': { $regex: query, $options: 'i' } }
-        ]
-      }).select('_id');
-
-      searchQuery.userId = { $in: users.map(u => u._id) };
-    }
-
-    // Specialization filter
-    if (specialization) {
-      searchQuery.specializations = specialization;
-    }
-
-    // Rating filter
-    if (minRating) {
-      searchQuery['rating.average'] = { $gte: parseFloat(minRating) };
-    }
-
-    let workers;
-
-    // Location-based search
-    if (longitude && latitude) {
-      const userIds = await User.find({
-        'location.coordinates': {
-          $near: {
-            $geometry: {
-              type: 'Point',
-              coordinates: [parseFloat(longitude), parseFloat(latitude)]
-            },
-            $maxDistance: parseInt(maxDistance)
-          }
-        }
-      }).select('_id');
-
-      searchQuery.userId = { $in: userIds.map(u => u._id) };
-    }
-
-    workers = await Worker.find(searchQuery)
-      .populate('userId', 'fullName profileImage location')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ 'rating.average': -1 });
-
-    const count = await Worker.countDocuments(searchQuery);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        workers,
-        totalPages: Math.ceil(count / limit),
-        currentPage: page,
-        total: count
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
 /**
  * @desc    Get worker reviews
@@ -707,3 +521,247 @@ exports.updateBankDetails = async (req, res, next) => {
     next(error);
   }
 };
+
+
+exports.searchWorkers = async (req, res, next) => {
+  try {
+    const {
+      serviceType,
+      district,
+      town,
+      availability,
+      verified,
+      minRating,
+      maxDistance,
+      sortBy = 'rating' // rating, experience, distance
+    } = req.query;
+
+    console.log('🔍 Searching workers with filters:', {
+      serviceType,
+      district,
+      town,
+      verified
+    });
+
+    // Build query
+    const query = {};
+
+    // Service type filter
+    if (serviceType) {
+      query.serviceCategories = { $in: [serviceType] };
+    }
+
+    // Location filter - search in serviceAreas
+    if (district || town) {
+      const locationQuery = {};
+      if (district) locationQuery['serviceAreas.district'] = district;
+      if (town) locationQuery['serviceAreas.town'] = town;
+      
+      // Match workers who serve the specified area
+      Object.assign(query, locationQuery);
+    }
+
+    // Availability filter
+    if (availability === 'true') {
+      query.availability = true;
+    }
+
+    // Verified filter
+    if (verified === 'true') {
+      query.isVerified = true;
+    }
+
+    // Rating filter
+    if (minRating) {
+      query.averageRating = { $gte: parseFloat(minRating) };
+    }
+
+    console.log('Query:', JSON.stringify(query, null, 2));
+
+    // Execute search with populated user data
+    let workers = await Worker.find(query)
+      .populate('userId', 'fullName email phoneNumber profileImage')
+      .lean();
+
+    console.log(`✅ Found ${workers.length} workers`);
+
+    // Sort results
+    if (sortBy === 'rating') {
+      workers.sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
+    } else if (sortBy === 'experience') {
+      workers.sort((a, b) => (b.experience || 0) - (a.experience || 0));
+    }
+
+    // ✅ Calculate approximate distance if needed (simplified)
+    // In a real app, you would use geospatial queries with actual coordinates
+    if (town && maxDistance) {
+      workers = workers.filter(worker => {
+        // Check if worker serves this town
+        return worker.serviceAreas?.some(area => area.town === town);
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        count: workers.length,
+        workers
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error searching workers:', error);
+    next(error);
+  }
+};
+
+/**
+ * ✅ NEW - Get worker profile by ID (for customers to view)
+ * @desc    Get detailed worker profile including reviews
+ * @route   GET /api/v1/workers/:id/profile
+ * @access  Public/Private
+ */
+exports.getWorkerProfile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    console.log('📋 Fetching worker profile:', id);
+
+    // Find worker with populated data
+    const worker = await Worker.findById(id)
+      .populate('userId', 'fullName email phoneNumber profileImage createdAt')
+      .lean();
+
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker not found'
+      });
+    }
+
+    // Get worker's reviews
+    const Review = require('../models/Review');
+    const reviews = await Review.find({
+      workerId: id,
+      status: 'approved'
+    })
+      .populate('customerId', 'fullName profileImage')
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    // Get completed bookings count
+    const Booking = require('../models/Booking');
+    const completedBookings = await Booking.countDocuments({
+      workerId: id,
+      status: 'completed'
+    });
+
+    // Compile profile data
+    const profileData = {
+      ...worker,
+      reviews,
+      completedBookingsCount: completedBookings,
+      memberSince: worker.userId?.createdAt
+    };
+
+    console.log('✅ Worker profile fetched successfully');
+
+    res.status(200).json({
+      success: true,
+      data: {
+        worker: profileData
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching worker profile:', error);
+    next(error);
+  }
+};
+
+/**
+ * ✅ EXISTING - Update your existing getWorkers method to support location filtering
+ * This is an enhancement to your existing method
+ */
+exports.getWorkers = async (req, res, next) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      order = 'desc',
+      search,
+      serviceType,
+      district,
+      town,
+      verified
+    } = req.query;
+
+    const query = {};
+
+    // Search filter (name or email)
+    if (search) {
+      const users = await User.find({
+        $or: [
+          { fullName: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } }
+        ]
+      }).select('_id');
+
+      query.userId = { $in: users.map(u => u._id) };
+    }
+
+    // Service type filter
+    if (serviceType) {
+      query.serviceCategories = { $in: [serviceType] };
+    }
+
+    // Location filters
+    if (district) {
+      query['serviceAreas.district'] = district;
+    }
+    if (town) {
+      query['serviceAreas.town'] = town;
+    }
+
+    // Verified filter
+    if (verified === 'true') {
+      query.isVerified = true;
+    }
+
+    const sortOrder = order === 'desc' ? -1 : 1;
+    const sortOptions = { [sortBy]: sortOrder };
+
+    const workers = await Worker.find(query)
+      .populate('userId', 'fullName email phoneNumber profileImage accountStatus')
+      .sort(sortOptions)
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .lean();
+
+    const count = await Worker.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        workers,
+        totalPages: Math.ceil(count / limit),
+        currentPage: parseInt(page),
+        total: count
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching workers:', error);
+    next(error);
+  }
+};
+
+
+
+
+
+
+
+
