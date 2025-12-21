@@ -65,7 +65,7 @@ const startServer = () => {
     logger.info('='.repeat(50));
     logger.info(`🚀 FixMate Server running in ${NODE_ENV} mode`);
     logger.info(`📡 Server listening on port ${PORT}`);
-    logger.info(`🌐 API URL: http://localhost:${PORT}/api/v1`);
+    logger.info(`🌐 API URL: http://localhost:${PORT}`);
     logger.info(`💚 Health check: http://localhost:${PORT}/health`);
     logger.info('='.repeat(50));
   });

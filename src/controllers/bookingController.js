@@ -557,7 +557,7 @@ exports.getBookingStats = async (req, res, next) => {
 /**
  * ✅ UPDATED - Create quote request with MANUAL LOCATION (no GPS)
  * @desc    Create a new quote request
- * @route   POST /api/v1/bookings/quote-request
+ * @route   POST /bookings/quote-request
  * @access  Private/Customer
  */
 exports.createQuoteRequest = async (req, res, next) => {
@@ -687,7 +687,7 @@ exports.createQuoteRequest = async (req, res, next) => {
 /**
  * ✅ NEW - Send quote request to specific worker
  * @desc    Send a quote request to a specific worker
- * @route   POST /api/v1/bookings/:id/send-to-worker
+ * @route   POST /bookings/:id/send-to-worker
  * @access  Private/Customer
  */
 exports.sendQuoteToWorker = async (req, res, next) => {
@@ -814,7 +814,7 @@ exports.sendQuoteToWorker = async (req, res, next) => {
 /**
  * ✅ UPDATED - Get customer's quote requests (with sentToWorkers info)
  * @desc    Get all quote requests for a customer
- * @route   GET /api/v1/bookings/my-quotes
+ * @route   GET /bookings/my-quotes
  * @access  Private/Customer
  */
 exports.getCustomerQuoteRequests = async (req, res, next) => {
@@ -862,7 +862,7 @@ exports.getCustomerQuoteRequests = async (req, res, next) => {
 /**
  * ✅ NEW - Get worker's received quote requests
  * @desc    Get all quote requests sent to a worker
- * @route   GET /api/v1/bookings/received-quotes
+ * @route   GET /bookings/received-quotes
  * @access  Private/Worker
  */
 exports.getWorkerReceivedQuotes = async (req, res, next) => {
@@ -913,7 +913,7 @@ exports.getWorkerReceivedQuotes = async (req, res, next) => {
 
 /**
  * @desc    Worker responds to quote request (accept/decline)
- * @route   PUT /api/v1/bookings/:id/respond
+ * @route   PUT /bookings/:id/respond
  * @access  Private/Worker
  */
 exports.respondToQuoteRequest = async (req, res, next) => {

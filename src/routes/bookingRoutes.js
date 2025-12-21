@@ -11,7 +11,7 @@ const { validateRequest } = require('../middleware/validator');
 // ============================================
 
 /**
- * @route   POST /api/v1/bookings/quote-request
+ * @route   POST /bookings/quote-request
  * @desc    Create a new quote request
  * @access  Private/Customer
  */
@@ -23,7 +23,7 @@ router.post(
 );
 
 /**
- * @route   GET /api/v1/bookings/my-quotes
+ * @route   GET /bookings/my-quotes
  * @desc    Get customer's quote requests
  * @access  Private/Customer
  */
@@ -35,7 +35,7 @@ router.get(
 );
 
 /**
- * @route   GET /api/v1/bookings/received-quotes
+ * @route   GET /bookings/received-quotes
  * @desc    Get worker's received quote requests
  * @access  Private/Worker
  */
@@ -47,21 +47,21 @@ router.get(
 );
 
 /**
- * @route   GET /api/v1/bookings/stats
+ * @route   GET /bookings/stats
  * @desc    Get booking statistics
  * @access  Private
  */
 router.get('/stats', authMiddleware, bookingController.getBookingStats);
 
 /**
- * @route   GET /api/v1/bookings
+ * @route   GET /bookings
  * @desc    Get all bookings (with filters)
  * @access  Private
  */
 router.get('/', authMiddleware, bookingController.getBookings);
 
 /**
- * @route   POST /api/v1/bookings
+ * @route   POST /bookings
  * @desc    Create a new booking
  * @access  Private/Customer
  */
@@ -85,7 +85,7 @@ router.post(
 // ============================================
 
 /**
- * @route   POST /api/v1/bookings/:id/send-to-worker
+ * @route   POST /bookings/:id/send-to-worker
  * @desc    Send quote request to specific worker
  * @access  Private/Customer
  * 
@@ -98,7 +98,7 @@ router.post(
   bookingController.sendQuoteToWorker
 );
 /**
- * @route   PUT /api/v1/bookings/:id/respond
+ * @route   PUT /bookings/:id/respond
  * @desc    Worker responds to quote request (accept/decline)
  * @access  Private/Worker
  */
@@ -110,7 +110,7 @@ router.put(
 );
 
 /**
- * @route   POST /api/v1/bookings/:id/quote
+ * @route   POST /bookings/:id/quote
  * @desc    Create quote for booking
  * @access  Private/Worker
  */
@@ -127,7 +127,7 @@ router.post(
 );
 
 /**
- * @route   POST /api/v1/bookings/:id/progress
+ * @route   POST /bookings/:id/progress
  * @desc    Update work progress
  * @access  Private/Worker
  */
@@ -140,7 +140,7 @@ router.post(
 );
 
 /**
- * @route   PUT /api/v1/bookings/:id/accept
+ * @route   PUT /bookings/:id/accept
  * @desc    Worker accepts booking
  * @access  Private/Worker
  */
@@ -152,7 +152,7 @@ router.put(
 );
 
 /**
- * @route   PUT /api/v1/bookings/:id/decline
+ * @route   PUT /bookings/:id/decline
  * @desc    Worker declines booking
  * @access  Private/Worker
  */
@@ -165,7 +165,7 @@ router.put(
 );
 
 /**
- * @route   PUT /api/v1/bookings/:id/cancel
+ * @route   PUT /bookings/:id/cancel
  * @desc    Cancel booking
  * @access  Private
  */
@@ -177,7 +177,7 @@ router.put(
 );
 
 /**
- * @route   PUT /api/v1/bookings/:id/status
+ * @route   PUT /bookings/:id/status
  * @desc    Update booking status
  * @access  Private
  */
@@ -189,7 +189,7 @@ router.put(
 );
 
 /**
- * @route   GET /api/v1/bookings/:id
+ * @route   GET /bookings/:id
  * @desc    Get booking by ID
  * @access  Private
  */

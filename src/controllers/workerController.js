@@ -5,7 +5,7 @@ const { Worker, User, Review, Booking } = require('../models');
 /**
  * ✅ NEW - Get nearby workers filtered by service type and location
  * @desc    Get nearby workers filtered by service type
- * @route   GET /api/v1/workers/nearby
+ * @route   GET /workers/nearby
  * @access  Private
  */
 exports.getNearbyWorkers = async (req, res, next) => {
@@ -618,7 +618,7 @@ exports.searchWorkers = async (req, res, next) => {
 /**
  * ✅ NEW - Get worker profile by ID (for customers to view)
  * @desc    Get detailed worker profile including reviews
- * @route   GET /api/v1/workers/:id/profile
+ * @route   GET /workers/:id/profile
  * @access  Public/Private
  */
 exports.getWorkerProfile = async (req, res, next) => {

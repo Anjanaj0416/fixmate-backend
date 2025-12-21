@@ -13,14 +13,14 @@ const { roleMiddleware } = require('../middleware/roleMiddleware');
 
 /**
  * ✅ NEW ROUTE - Get nearby workers
- * @route   GET /api/v1/workers/nearby
+ * @route   GET /workers/nearby
  * @desc    Get nearby workers by location and service type
  * @access  Private
  */
 router.get('/nearby', authMiddleware, workerController.getNearbyWorkers);
 
 /**
- * @route   GET /api/v1/workers/search
+ * @route   GET /workers/search
  * @desc    Search workers by service type and location
  * @access  Public/Private
  * 
@@ -44,7 +44,7 @@ router.get(
 );
 
 /**
- * @route   GET /api/v1/workers/profile
+ * @route   GET /workers/profile
  * @desc    Get current worker's profile
  * @access  Private/Worker
  * 
@@ -105,7 +105,7 @@ router.put(
   workerController.updateWorkerProfile
 );
 /**
- * @route   GET /api/v1/workers/:id/profile
+ * @route   GET /workers/:id/profile
  * @desc    Get worker profile (for customers to view)
  * @access  Public/Private
  * 

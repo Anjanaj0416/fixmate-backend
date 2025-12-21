@@ -27,18 +27,18 @@ router.get('/', (req, res) => {
     message: 'Welcome to FixMate API v1',
     version: '1.0.0',
     endpoints: {
-      auth: '/api/v1/auth',
-      users: '/api/v1/users',
-      workers: '/api/v1/workers',
-      bookings: '/api/v1/bookings',
-      reviews: '/api/v1/reviews',
-      chat: '/api/v1/chat',
-      notifications: '/api/v1/notifications',
-      payments: '/api/v1/payments',
-      admin: '/api/v1/admin',
-      ai: '/api/v1/ai'
+      auth: '/auth',
+      users: '/users',
+      workers: '/workers',
+      bookings: '/bookings',
+      reviews: '/reviews',
+      chat: '/chat',
+      notifications: '/notifications',
+      payments: '/payments',
+      admin: '/admin',
+      ai: '/ai'
     },
-    documentation: '/api/v1/docs',
+    documentation: '/docs',
     status: 'active'
   });
 });
@@ -65,7 +65,7 @@ router.get('/docs', (req, res) => {
     success: true,
     message: 'API Documentation',
     info: 'Complete API documentation coming soon',
-    swagger: '/api/v1/swagger',
+    swagger: '/swagger',
     postman: 'Import Postman collection for full documentation'
   });
 });

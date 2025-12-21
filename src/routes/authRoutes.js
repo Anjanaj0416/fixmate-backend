@@ -5,7 +5,7 @@ const { authMiddleware } = require('../middleware/authMiddleware');
 const { validateRequest } = require('../middleware/validator');
 
 /**
- * @route   POST /api/v1/auth/register
+ * @route   POST /auth/register
  * @desc    Register a new user
  * @access  Public
  */
@@ -22,7 +22,7 @@ router.post(
 );
 
 /**
- * @route   POST /api/v1/auth/signup
+ * @route   POST /auth/signup
  * @desc    Register a new user (alternative endpoint for frontend)
  * @access  Public
  * 
@@ -41,7 +41,7 @@ router.post(
 );
 
 /**
- * @route   POST /api/v1/auth/login
+ * @route   POST /auth/login
  * @desc    Login user
  * @access  Public
  */
@@ -52,21 +52,21 @@ router.post(
 );
 
 /**
- * @route   POST /api/v1/auth/logout
+ * @route   POST /auth/logout
  * @desc    Logout user
  * @access  Private
  */
 router.post('/logout', authMiddleware, authController.logout);
 
 /**
- * @route   POST /api/v1/auth/verify-token
+ * @route   POST /auth/verify-token
  * @desc    Verify Firebase token
  * @access  Public
  */
 router.post('/verify-token', authController.verifyToken);
 
 /**
- * @route   PUT /api/v1/auth/fcm-token
+ * @route   PUT /auth/fcm-token
  * @desc    Update FCM token for push notifications
  * @access  Private
  */
@@ -78,7 +78,7 @@ router.put(
 );
 
 /**
- * @route   POST /api/v1/auth/forgot-password
+ * @route   POST /auth/forgot-password
  * @desc    Request password reset
  * @access  Public
  */
@@ -89,7 +89,7 @@ router.post(
 );
 
 /**
- * @route   POST /api/v1/auth/verify-phone
+ * @route   POST /auth/verify-phone
  * @desc    Verify phone number
  * @access  Private
  */
@@ -101,7 +101,7 @@ router.post(
 );
 
 /**
- * @route   DELETE /api/v1/auth/delete-account
+ * @route   DELETE /auth/delete-account
  * @desc    Delete user account
  * @access  Private
  */

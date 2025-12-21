@@ -113,15 +113,15 @@ app.get('/api', (req, res) => {
     message: 'FixMate API',
     version: '1.0.0',
     endpoints: {
-      auth: '/api/v1/auth',
-      users: '/api/v1/users',
-      workers: '/api/v1/workers',
-      bookings: '/api/v1/bookings',
+      auth: '/auth',
+      users: '/users',
+      workers: '/workers',
+      bookings: '/bookings',
     }
   });
 });
 
-app.use('/api/v1', routes);
+app.use('', routes);
 
 // ==========================================
 // Error Handling
