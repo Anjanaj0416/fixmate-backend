@@ -22,6 +22,7 @@ const { errorHandler } = require('./src/middleware/errorHandler');
  * 1. CORS allows localhost:5173 (Vite)
  * 2. Better logging
  * 3. OPTIONS preflight handler
+ * 4. ✅ INCREASED BODY SIZE LIMIT to 50MB for Base64 images
  */
 
 const app = express();
@@ -80,8 +81,13 @@ app.use('/api/', rateLimit({
   message: RATE_LIMITS.MESSAGE,
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// ✅ CRITICAL FIX: Increase body size limit to 50MB for Base64 images
+// Base64 encoding increases file size by ~33%, so:
+// - 5 images x 5MB each = 25MB raw
+// - After Base64: 25MB x 1.33 = ~33MB
+// - Set limit to 50MB to provide buffer
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(compression());
 
 if (process.env.NODE_ENV === 'development') {
