@@ -758,6 +758,104 @@ exports.getWorkers = async (req, res, next) => {
   }
 };
 
+/**
+ * Get worker's OWN profile (authenticated worker viewing their own profile)
+ * @desc    Get current worker's profile with stats
+ * @route   GET /api/v1/workers/profile
+ * @access  Private/Worker
+ */
+exports.getWorkerOwnProfile = async (req, res, next) => {
+  try {
+    console.log('📋 Fetching own worker profile for user:', req.user.email);
+
+    // Find worker by userId (from auth token)
+    const worker = await Worker.findOne({ userId: req.user._id })
+      .populate('userId', 'fullName email phoneNumber profileImage createdAt location')
+      .lean();
+
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker profile not found'
+      });
+    }
+
+    console.log('✅ Worker own profile fetched successfully');
+
+    res.status(200).json({
+      success: true,
+      data: worker
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching worker own profile:', error);
+    next(error);
+  }
+};
+
+/**
+ * Get worker profile by ID (for customers to view)
+ * @desc    Get detailed worker profile including reviews
+ * @route   GET /api/v1/workers/:id/profile
+ * @access  Public
+ */
+exports.getWorkerProfileById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    console.log('📋 Fetching worker profile by ID:', id);
+
+    // Find worker with populated data
+    const worker = await Worker.findById(id)
+      .populate('userId', 'fullName email phoneNumber profileImage createdAt')
+      .lean();
+
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker not found'
+      });
+    }
+
+    // Get worker's reviews
+    const reviews = await Review.find({
+      workerId: id,
+      status: 'approved'
+    })
+      .populate('customerId', 'fullName profileImage')
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    // Get completed bookings count
+    const completedBookings = await Booking.countDocuments({
+      workerId: id,
+      status: 'completed'
+    });
+
+    // Compile profile data
+    const profileData = {
+      ...worker,
+      memberSince: worker.userId?.createdAt
+    };
+
+    console.log('✅ Worker profile fetched successfully');
+
+    res.status(200).json({
+      success: true,
+      data: {
+        worker: profileData,
+        reviews: reviews,
+        completedJobs: completedBookings
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching worker profile:', error);
+    next(error);
+  }
+};
+
 
 
 

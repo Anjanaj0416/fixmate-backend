@@ -88,34 +88,31 @@ router.get('/:id', workerController.getWorkerById);
 router.get('/:id/reviews', workerController.getWorkerReviews);
 
 /**
- * ========================================
- * UPDATE/CREATE ROUTES
- * ========================================
- */
-
-/**
- * @route   PUT /api/workers/profile
- * @desc    Create/Update worker profile
+ * ⭐ CRITICAL FIX: Worker's OWN profile (authenticated)
+ * @route   GET /api/v1/workers/profile
+ * @desc    Get current worker's own profile
  * @access  Private/Worker
+ * 
+ * IMPORTANT: This route MUST come BEFORE /:id routes
+ * Uses getWorkerOwnProfile function (gets worker from auth token)
  */
-router.put(
+router.get(
   '/profile',
   authMiddleware,
   roleMiddleware(['worker']),
-  workerController.updateWorkerProfile
-);
-/**
- * @route   GET /workers/:id/profile
- * @desc    Get worker profile (for customers to view)
- * @access  Public/Private
- * 
- * ✅ ADD THIS ROUTE
- */
-router.get(
-  '/:id/profile',
-  workerController.getWorkerProfile
+  workerController.getWorkerOwnProfile
 );
 
+/**
+ * ⭐ CRITICAL FIX: View ANY worker's profile by ID (for customers)
+ * @route   GET /api/v1/workers/:id/profile
+ * @desc    Get worker profile by ID (for customers to view)
+ * @access  Public
+ * 
+ * IMPORTANT: This route MUST come BEFORE the generic /:id route
+ * Uses getWorkerProfileById function (gets worker by ID from URL)
+ */
+router.get('/:id/profile', workerController.getWorkerProfileById);
 /**
  * @route   POST /api/workers/portfolio
  * @desc    Add portfolio image
@@ -175,5 +172,9 @@ router.put(
   roleMiddleware(['worker']),
   workerController.updateBankDetails
 );
+
+
+
+
 
 module.exports = router;
