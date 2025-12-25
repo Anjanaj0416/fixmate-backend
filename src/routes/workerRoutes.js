@@ -12,7 +12,6 @@ const { roleMiddleware } = require('../middleware/roleMiddleware');
  */
 
 /**
- * ✅ NEW ROUTE - Get nearby workers
  * @route   GET /workers/nearby
  * @desc    Get nearby workers by location and service type
  * @access  Private
@@ -23,16 +22,11 @@ router.get('/nearby', authMiddleware, workerController.getNearbyWorkers);
  * @route   GET /workers/search
  * @desc    Search workers by service type and location
  * @access  Public/Private
- * 
- * ✅ ADD THIS ROUTE BEFORE ANY /:id ROUTES
  */
-router.get(
-  '/search',
-  workerController.searchWorkers
-);
+router.get('/search', workerController.searchWorkers);
 
 /**
- * @route   GET /api/workers/stats
+ * @route   GET /workers/stats
  * @desc    Get worker statistics
  * @access  Private/Worker
  */
@@ -44,22 +38,35 @@ router.get(
 );
 
 /**
+ * ⭐ CRITICAL FIX: Worker's OWN profile (authenticated)
  * @route   GET /workers/profile
- * @desc    Get current worker's profile
+ * @desc    Get current worker's own profile
  * @access  Private/Worker
  * 
- * IMPORTANT: This route MUST come BEFORE the /:id route
- * Otherwise /:id will match "/profile" and treat "profile" as an ID
+ * IMPORTANT: This route MUST come BEFORE /:id routes
+ * Calls getWorkerOwnProfile function (gets worker from auth token, not from URL params)
  */
 router.get(
   '/profile',
   authMiddleware,
   roleMiddleware(['worker']),
-  workerController.getWorkerProfile
+  workerController.getWorkerOwnProfile  // ✅ CORRECT FUNCTION - uses req.user._id
 );
 
 /**
- * @route   GET /api/workers
+ * @route   PUT /workers/profile
+ * @desc    Update worker profile
+ * @access  Private/Worker
+ */
+router.put(
+  '/profile',
+  authMiddleware,
+  roleMiddleware(['worker']),
+  workerController.updateWorkerProfile
+);
+
+/**
+ * @route   GET /workers
  * @desc    Get all workers with filters
  * @access  Public
  */
@@ -72,49 +79,28 @@ router.get('/', workerController.getWorkers);
  */
 
 /**
- * @route   GET /api/workers/:id
+ * @route   GET /workers/:id
  * @desc    Get worker by ID
  * @access  Public
- * 
- * IMPORTANT: This dynamic route should come AFTER specific routes
  */
 router.get('/:id', workerController.getWorkerById);
 
 /**
- * @route   GET /api/workers/:id/reviews
+ * @route   GET /workers/:id/profile
+ * @desc    Get worker profile by ID (for customers to view)
+ * @access  Public
+ */
+router.get('/:id/profile', workerController.getWorkerProfileById);
+
+/**
+ * @route   GET /workers/:id/reviews
  * @desc    Get worker reviews
  * @access  Public
  */
 router.get('/:id/reviews', workerController.getWorkerReviews);
 
 /**
- * ⭐ CRITICAL FIX: Worker's OWN profile (authenticated)
- * @route   GET /api/v1/workers/profile
- * @desc    Get current worker's own profile
- * @access  Private/Worker
- * 
- * IMPORTANT: This route MUST come BEFORE /:id routes
- * Uses getWorkerOwnProfile function (gets worker from auth token)
- */
-router.get(
-  '/profile',
-  authMiddleware,
-  roleMiddleware(['worker']),
-  workerController.getWorkerOwnProfile
-);
-
-/**
- * ⭐ CRITICAL FIX: View ANY worker's profile by ID (for customers)
- * @route   GET /api/v1/workers/:id/profile
- * @desc    Get worker profile by ID (for customers to view)
- * @access  Public
- * 
- * IMPORTANT: This route MUST come BEFORE the generic /:id route
- * Uses getWorkerProfileById function (gets worker by ID from URL)
- */
-router.get('/:id/profile', workerController.getWorkerProfileById);
-/**
- * @route   POST /api/workers/portfolio
+ * @route   POST /workers/portfolio
  * @desc    Add portfolio image
  * @access  Private/Worker
  */
@@ -126,7 +112,7 @@ router.post(
 );
 
 /**
- * @route   DELETE /api/workers/portfolio/:imageId
+ * @route   DELETE /workers/portfolio/:imageId
  * @desc    Remove portfolio image
  * @access  Private/Worker
  */
@@ -138,7 +124,7 @@ router.delete(
 );
 
 /**
- * @route   PUT /api/workers/availability
+ * @route   PUT /workers/availability
  * @desc    Update availability status
  * @access  Private/Worker
  */
@@ -150,7 +136,7 @@ router.put(
 );
 
 /**
- * @route   POST /api/workers/certifications
+ * @route   POST /workers/certifications
  * @desc    Add certification
  * @access  Private/Worker
  */
@@ -162,7 +148,7 @@ router.post(
 );
 
 /**
- * @route   PUT /api/workers/bank-details
+ * @route   PUT /workers/bank-details
  * @desc    Update bank details for payouts
  * @access  Private/Worker
  */
@@ -172,9 +158,5 @@ router.put(
   roleMiddleware(['worker']),
   workerController.updateBankDetails
 );
-
-
-
-
 
 module.exports = router;
