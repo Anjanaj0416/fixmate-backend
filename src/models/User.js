@@ -39,9 +39,9 @@ const userSchema = new mongoose.Schema({
   // User Role
   role: {
     type: String,
-    enum: ['customer', 'worker', 'admin'],
+    enum: ['pending','customer', 'worker', 'admin'],
     required: true,
-    default: 'customer'
+    default: 'pending'
   },
   
   // Account Status

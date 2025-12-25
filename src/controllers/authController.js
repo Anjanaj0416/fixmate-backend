@@ -107,7 +107,7 @@ exports.register = async (req, res, next) => {
             serviceCategories: serviceCategories || [],
             specializations: specializations || [],
             experience: experience || 0,
-            hourlyRate: hourlyRate || 0,
+            hourlyRate: hourlyRate || 500,
             skills: skills || [],
             bio: bio || '',
             serviceLocations: serviceLocations || [],
