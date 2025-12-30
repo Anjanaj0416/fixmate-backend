@@ -24,17 +24,17 @@ const workerSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  
+
   firebaseUid: {
     type: String,
     required: true,
     unique: true
   },
-  
+
   // ==========================================
   // ✅ UPDATED: SERVICE INFORMATION
   // ==========================================
-  
+
   // ✅ NEW FIELD: Main service categories (enum-based for filtering)
   serviceCategories: [{
     type: String,
@@ -57,7 +57,7 @@ const workerSchema = new mongoose.Schema({
       'other'
     ]
   }],
-  
+
   // ✅ UPDATED FIELD: Detailed specializations (flexible, no enum)
   // This field now accepts ANY string value like "Drain Cleaning", "Pipe Repair", etc.
   specializations: [{
@@ -65,7 +65,7 @@ const workerSchema = new mongoose.Schema({
     required: false  // Changed from true to false
     // NO ENUM - accepts any specialization string
   }],
-  
+
   // ==========================================
   // PROFESSIONAL INFORMATION
   // ==========================================
@@ -74,7 +74,7 @@ const workerSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
-  
+
   // ==========================================
   // PRICING
   // ==========================================
@@ -83,7 +83,7 @@ const workerSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
-  
+
   // ==========================================
   // AVAILABILITY
   // ==========================================
@@ -91,53 +91,60 @@ const workerSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  
+
   workingHours: {
-    monday: { 
-      start: String, 
-      end: String, 
-      available: { type: Boolean, default: true } 
+    monday: {
+      start: String,
+      end: String,
+      available: { type: Boolean, default: true }
     },
-    tuesday: { 
-      start: String, 
-      end: String, 
-      available: { type: Boolean, default: true } 
+    tuesday: {
+      start: String,
+      end: String,
+      available: { type: Boolean, default: true }
     },
-    wednesday: { 
-      start: String, 
-      end: String, 
-      available: { type: Boolean, default: true } 
+    wednesday: {
+      start: String,
+      end: String,
+      available: { type: Boolean, default: true }
     },
-    thursday: { 
-      start: String, 
-      end: String, 
-      available: { type: Boolean, default: true } 
+    thursday: {
+      start: String,
+      end: String,
+      available: { type: Boolean, default: true }
     },
-    friday: { 
-      start: String, 
-      end: String, 
-      available: { type: Boolean, default: true } 
+    friday: {
+      start: String,
+      end: String,
+      available: { type: Boolean, default: true }
     },
-    saturday: { 
-      start: String, 
-      end: String, 
-      available: { type: Boolean, default: true } 
+    saturday: {
+      start: String,
+      end: String,
+      available: { type: Boolean, default: true }
     },
-    sunday: { 
-      start: String, 
-      end: String, 
-      available: { type: Boolean, default: false } 
+    sunday: {
+      start: String,
+      end: String,
+      available: { type: Boolean, default: false }
     }
   },
-  
+
   // ==========================================
   // LOCATION & SERVICE AREA
   // ==========================================
-  serviceLocations: [{
-    city: String,
-    district: String
+  // ✅ Service areas where worker provides services
+  // Changed from serviceLocations to serviceAreas, city to town
+  serviceAreas: [{
+    town: {
+      type: String,
+      required: false
+    },
+    district: {
+      type: String,
+      required: false
+    }
   }],
-  
   // ==========================================
   // PORTFOLIO
   // ==========================================
@@ -149,7 +156,7 @@ const workerSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  
+
   // ==========================================
   // PROFILE INFORMATION
   // ==========================================
@@ -158,18 +165,18 @@ const workerSchema = new mongoose.Schema({
     maxlength: 500,
     default: ''
   },
-  
+
   skills: [{
     type: String
   }],
-  
+
   certifications: [{
     name: String,
     issuedBy: String,
     issuedDate: Date,
     imageUrl: String
   }],
-  
+
   // ==========================================
   // RATING & REVIEWS
   // ==========================================
@@ -185,7 +192,7 @@ const workerSchema = new mongoose.Schema({
       default: 0
     }
   },
-  
+
   // ==========================================
   // STATISTICS
   // ==========================================
@@ -193,22 +200,22 @@ const workerSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  
+
   totalEarnings: {
     type: Number,
     default: 0
   },
-  
+
   responseTime: {
     type: Number, // Average in minutes
     default: 0
   },
-  
+
   acceptanceRate: {
     type: Number, // Percentage
     default: 0
   },
-  
+
   // ==========================================
   // VERIFICATION
   // ==========================================
@@ -216,7 +223,7 @@ const workerSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  
+
   verificationDocuments: [{
     url: String,
     docType: String,
@@ -227,7 +234,7 @@ const workerSchema = new mongoose.Schema({
       default: 'pending'
     }
   }],
-  
+
   // ==========================================
   // PROFILE STATUS
   // ==========================================
@@ -236,7 +243,7 @@ const workerSchema = new mongoose.Schema({
     enum: ['incomplete', 'pending-review', 'active', 'suspended'],
     default: 'incomplete'
   },
-  
+
   // ==========================================
   // BANK DETAILS
   // ==========================================
@@ -250,7 +257,7 @@ const workerSchema = new mongoose.Schema({
       default: false
     }
   },
-  
+
   // ==========================================
   // TIMESTAMPS
   // ==========================================
@@ -258,7 +265,7 @@ const workerSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  
+
   updatedAt: {
     type: Date,
     default: Date.now
@@ -277,7 +284,8 @@ workerSchema.index({ specializations: 1 });
 workerSchema.index({ 'rating.average': -1 });
 workerSchema.index({ availability: 1 });
 workerSchema.index({ profileStatus: 1 });
-workerSchema.index({ 'serviceLocations.city': 1 });
+workerSchema.index({ 'serviceAreas.town': 1 });
+workerSchema.index({ 'serviceAreas.district': 1 });
 
 // ==========================================
 // METHODS
@@ -286,7 +294,7 @@ workerSchema.index({ 'serviceLocations.city': 1 });
 /**
  * Update worker rating with new review
  */
-workerSchema.methods.updateRating = async function(newRating) {
+workerSchema.methods.updateRating = async function (newRating) {
   const totalRating = (this.rating.average * this.rating.count) + newRating;
   this.rating.count += 1;
   this.rating.average = totalRating / this.rating.count;
@@ -296,7 +304,7 @@ workerSchema.methods.updateRating = async function(newRating) {
 /**
  * Increment completed jobs counter
  */
-workerSchema.methods.incrementCompletedJobs = async function() {
+workerSchema.methods.incrementCompletedJobs = async function () {
   this.completedJobs += 1;
   await this.save();
 };
@@ -308,7 +316,7 @@ workerSchema.methods.incrementCompletedJobs = async function() {
 /**
  * Update timestamp before save
  */
-workerSchema.pre('save', function(next) {
+workerSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });

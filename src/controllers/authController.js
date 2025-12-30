@@ -16,6 +16,7 @@ const getAdmin = () => {
  * @access  Public
  * 
  * ✅ FIXED: Handles orphaned users and includes better error recovery
+ * ✅ UPDATED: Converts serviceLocations to serviceAreas for worker registration
  */
 exports.register = async (req, res, next) => {
   try {
@@ -100,6 +101,16 @@ exports.register = async (req, res, next) => {
         if (!existingWorker) {
           console.log('🔧 Found orphaned user (no worker profile), completing registration...');
           
+          // ✅ Convert serviceLocations (from frontend) to serviceAreas (for database)
+          // Frontend sends: serviceLocations with "city"
+          // Database needs: serviceAreas with "town"
+          const serviceAreas = serviceLocations?.map(loc => ({
+            town: loc.city,      // Map city → town
+            district: loc.district
+          })) || [];
+
+          console.log('📍 Converted service locations:', serviceAreas);
+          
           // Create the missing worker profile
           const workerProfile = await Worker.create({
             userId: existingUser._id,
@@ -110,7 +121,7 @@ exports.register = async (req, res, next) => {
             hourlyRate: hourlyRate || 500,
             skills: skills || [],
             bio: bio || '',
-            serviceLocations: serviceLocations || [],
+            serviceAreas: serviceAreas,  // ✅ Use converted serviceAreas
             availability: availability !== false,
             workingHours: workingHours || {
               monday: { start: '08:00', end: '18:00', available: true },
@@ -185,6 +196,16 @@ exports.register = async (req, res, next) => {
       console.log('🔧 Creating worker profile with complete data...');
 
       try {
+        // ✅ Convert serviceLocations (from frontend) to serviceAreas (for database)
+        // Frontend sends: serviceLocations with "city"
+        // Database needs: serviceAreas with "town"
+        const serviceAreas = serviceLocations?.map(loc => ({
+          town: loc.city,      // Map city → town
+          district: loc.district
+        })) || [];
+
+        console.log('📍 Converted service locations:', serviceAreas);
+
         const workerProfile = await Worker.create({
           userId: newUser._id,
           firebaseUid: newUser.firebaseUid,
@@ -194,7 +215,7 @@ exports.register = async (req, res, next) => {
           hourlyRate: hourlyRate || 0,
           skills: skills || [],
           bio: bio || '',
-          serviceLocations: serviceLocations || [],
+          serviceAreas: serviceAreas,  // ✅ Use converted serviceAreas
           availability: availability !== false,
           workingHours: workingHours || {
             monday: { start: '08:00', end: '18:00', available: true },
