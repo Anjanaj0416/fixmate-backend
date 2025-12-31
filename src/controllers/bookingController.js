@@ -68,16 +68,25 @@ exports.createBooking = async (req, res, next) => {
  */
 exports.getBookings = async (req, res, next) => {
   try {
-    const { firebaseUid, role } = req.user;
-    const { status, page = 1, limit = 20 } = req.query;
+    const { firebaseUid } = req.user;
+    const { role, status, page = 1, limit = 20 } = req.query;
 
     const user = await User.findOne({ firebaseUid });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
 
     const query = {};
+    
+    // ✅ Filter by role
     if (role === 'customer') {
       query.customerId = user._id;
     } else if (role === 'worker') {
-      query.workerId = user._id;
+      query.workerId = user._id;  // ✅ This is critical
     }
 
     if (status) query.status = status;
