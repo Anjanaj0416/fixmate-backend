@@ -912,6 +912,7 @@ exports.getWorkerReceivedQuotes = async (req, res, next) => {
 
 
 /**
+ * ✅ FIXED - Worker responds to quote request (accept/decline)
  * @desc    Worker responds to quote request (accept/decline)
  * @route   PUT /bookings/:id/respond
  * @access  Private/Worker
@@ -922,6 +923,14 @@ exports.respondToQuoteRequest = async (req, res, next) => {
     const { response, quoteAmount, quoteDetails, declineReason } = req.body;
     const { firebaseUid } = req.user;
 
+    console.log('📨 Respond to quote request:', {
+      bookingId: id,
+      response,
+      quoteAmount,
+      firebaseUid
+    });
+
+    // Validate response type
     if (!['accept', 'decline'].includes(response)) {
       return res.status(400).json({
         success: false,
@@ -929,9 +938,9 @@ exports.respondToQuoteRequest = async (req, res, next) => {
       });
     }
 
+    // Find the booking
     const booking = await Booking.findById(id)
-      .populate('customerId', 'fullName email')
-      .populate('workerId');
+      .populate('customerId', 'fullName email phoneNumber');
 
     if (!booking) {
       return res.status(404).json({
@@ -940,71 +949,279 @@ exports.respondToQuoteRequest = async (req, res, next) => {
       });
     }
 
-    // Verify worker owns this booking
+    // Find user and worker
     const user = await User.findOne({ firebaseUid });
-    const worker = await Worker.findOne({ userId: user._id });
-
-    if (booking.workerId._id.toString() !== worker._id.toString()) {
-      return res.status(403).json({
+    if (!user) {
+      return res.status(404).json({
         success: false,
-        message: 'Unauthorized access'
+        message: 'User not found'
       });
     }
 
+    const worker = await Worker.findOne({ userId: user._id });
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker profile not found'
+      });
+    }
+
+    // ✅ FIX: Check if worker is in sentToWorkers array (not workerId)
+    const isWorkerInvited = booking.sentToWorkers.some(
+      w => w.toString() === worker._id.toString()
+    );
+
+    if (!isWorkerInvited) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to respond to this quote request'
+      });
+    }
+
+    // Handle accept response
     if (response === 'accept') {
-      if (!quoteAmount || !quoteDetails) {
+      if (!quoteAmount) {
         return res.status(400).json({
           success: false,
-          message: 'Quote amount and details are required'
+          message: 'Quote amount is required'
         });
       }
 
+      // Update booking with quote
       booking.status = 'accepted';
+      booking.workerId = user._id; // ✅ Now assign the worker
       booking.quote = {
         amount: quoteAmount,
-        details: quoteDetails,
+        details: quoteDetails || '',
         createdAt: new Date(),
         validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
       };
 
-      // Notify customer
-      await Notification.create({
-        userId: booking.customerId._id,
-        type: 'quote-received',
-        title: 'Quote Received',
-        message: `${worker.userId.fullName} has sent you a quote for LKR ${quoteAmount}`,
-        relatedBooking: booking._id,
-        relatedUser: worker.userId._id
-      });
+      // Create notification for customer
+      try {
+        const Notification = require('../models/Notification');
+        await Notification.create({
+          userId: booking.customerId._id,
+          type: 'quote-received',
+          title: 'Quote Received',
+          message: `${user.fullName} has sent you a quote for LKR ${quoteAmount}`,
+          relatedBooking: booking._id,
+          relatedUser: user._id
+        });
+      } catch (notifError) {
+        console.log('⚠️ Notification creation failed (non-critical):', notifError.message);
+      }
 
-    } else {
+      console.log('✅ Worker accepted quote request');
+
+    } else { // decline
       booking.status = 'declined';
       booking.declineReason = declineReason || 'Worker declined the request';
 
-      // Notify customer
-      await Notification.create({
-        userId: booking.customerId._id,
-        type: 'booking-declined',
-        title: 'Quote Request Declined',
-        message: `${worker.userId.fullName} declined your quote request`,
-        relatedBooking: booking._id,
-        relatedUser: worker.userId._id
-      });
+      // Create notification for customer
+      try {
+        const Notification = require('../models/Notification');
+        await Notification.create({
+          userId: booking.customerId._id,
+          type: 'booking-declined',
+          title: 'Quote Request Declined',
+          message: `${user.fullName} declined your quote request`,
+          relatedBooking: booking._id,
+          relatedUser: user._id
+        });
+      } catch (notifError) {
+        console.log('⚠️ Notification creation failed (non-critical):', notifError.message);
+      }
+
+      console.log('✅ Worker declined quote request');
     }
 
+    // Save the booking
     await booking.save();
-
-    console.log('✅ Worker responded to quote:', {
-      bookingId: booking._id,
-      response,
-      quoteAmount
-    });
 
     res.status(200).json({
       success: true,
       message: `Quote request ${response}ed successfully`,
-      booking
+      data: { booking }
     });
+
+  } catch (error) {
+    console.error('❌ Error responding to quote:', error);
+    next(error);
+  }
+};
+
+/**
+ * ✅ COMPLETE FIX - Worker responds to quote request (accept/decline)
+ * Saves to BOTH booking.quote AND creates separate Quote document
+ * @desc    Worker responds to quote request (accept/decline)
+ * @route   PUT /bookings/:id/respond
+ * @access  Private/Worker
+ */
+exports.respondToQuoteRequest = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { response, quoteAmount, quoteDetails, declineReason } = req.body;
+    const { firebaseUid } = req.user;
+
+    console.log('📨 Respond to quote request:', {
+      bookingId: id,
+      response,
+      quoteAmount,
+      firebaseUid
+    });
+
+    // Validate response type
+    if (!['accept', 'decline'].includes(response)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid response. Must be "accept" or "decline"'
+      });
+    }
+
+    // Find the booking
+    const booking = await Booking.findById(id)
+      .populate('customerId', 'fullName email phoneNumber');
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Quote request not found'
+      });
+    }
+
+    // Find user and worker
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const worker = await Worker.findOne({ userId: user._id });
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker profile not found'
+      });
+    }
+
+    // ✅ Check if worker is in sentToWorkers array
+    const isWorkerInvited = booking.sentToWorkers.some(
+      w => w.toString() === worker._id.toString()
+    );
+
+    if (!isWorkerInvited) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to respond to this quote request'
+      });
+    }
+
+    // Handle accept response
+    if (response === 'accept') {
+      if (!quoteAmount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Quote amount is required'
+        });
+      }
+
+      const validUntilDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+      // ✅ Update booking with quote
+      booking.status = 'accepted';
+      booking.workerId = user._id; // Assign the worker
+      booking.quote = {
+        amount: quoteAmount,
+        details: quoteDetails || '',
+        createdAt: new Date(),
+        validUntil: validUntilDate,
+        status: 'pending'
+      };
+
+      await booking.save();
+
+      // ✅ CREATE SEPARATE QUOTE DOCUMENT in quotes collection
+      const Quote = require('../models/Quote');
+      const newQuote = await Quote.create({
+        bookingId: booking._id,
+        customerId: booking.customerId._id,
+        workerId: user._id,
+        serviceType: booking.serviceType,
+        totalAmount: quoteAmount,
+        notes: quoteDetails || '',
+        validUntil: validUntilDate,
+        status: 'sent',
+        sentAt: new Date(),
+        // Optional: Add breakdown if you want
+        breakdown: [{
+          item: booking.serviceType,
+          description: quoteDetails || 'Service quote',
+          quantity: 1,
+          unitPrice: quoteAmount,
+          totalPrice: quoteAmount
+        }]
+      });
+
+      console.log('✅ Quote document created:', newQuote._id);
+
+      // Create notification for customer
+      try {
+        const Notification = require('../models/Notification');
+        await Notification.create({
+          userId: booking.customerId._id,
+          type: 'quote-received',
+          title: 'Quote Received',
+          message: `${user.fullName} has sent you a quote for LKR ${quoteAmount}`,
+          relatedBooking: booking._id,
+          relatedUser: user._id
+        });
+      } catch (notifError) {
+        console.log('⚠️ Notification creation failed (non-critical):', notifError.message);
+      }
+
+      console.log('✅ Worker accepted quote request - Booking & Quote saved');
+
+      res.status(200).json({
+        success: true,
+        message: 'Quote accepted and sent successfully',
+        data: { 
+          booking,
+          quote: newQuote
+        }
+      });
+
+    } else { // decline
+      booking.status = 'declined';
+      booking.declineReason = declineReason || 'Worker declined the request';
+
+      await booking.save();
+
+      // Create notification for customer
+      try {
+        const Notification = require('../models/Notification');
+        await Notification.create({
+          userId: booking.customerId._id,
+          type: 'booking-declined',
+          title: 'Quote Request Declined',
+          message: `${user.fullName} declined your quote request`,
+          relatedBooking: booking._id,
+          relatedUser: user._id
+        });
+      } catch (notifError) {
+        console.log('⚠️ Notification creation failed (non-critical):', notifError.message);
+      }
+
+      console.log('✅ Worker declined quote request');
+
+      res.status(200).json({
+        success: true,
+        message: 'Quote request declined successfully',
+        data: { booking }
+      });
+    }
 
   } catch (error) {
     console.error('❌ Error responding to quote:', error);

@@ -855,3 +855,143 @@ exports.getWorkerProfileById = async (req, res, next) => {
     next(error);
   }
 };
+/**
+ * ✅ NEW - Get worker dashboard data
+ * @desc    Get worker dashboard data with stats and recent bookings
+ * @route   GET /workers/dashboard
+ * @access  Private/Worker
+ */
+exports.getDashboard = async (req, res, next) => {
+  try {
+    const { firebaseUid } = req.user;
+
+    console.log('📊 Fetching dashboard for worker:', firebaseUid);
+
+    // Find user
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Find worker profile
+    const worker = await Worker.findOne({ userId: user._id });
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker profile not found'
+      });
+    }
+
+    console.log('👷 Worker found:', worker._id);
+
+    // Get booking statistics
+    const pendingRequestsCount = await Booking.countDocuments({
+      sentToWorkers: worker._id,
+      status: { $in: ['quote_requested', 'pending'] }
+    });
+
+    const activeJobsCount = await Booking.countDocuments({
+      workerId: user._id,
+      status: { $in: ['accepted', 'in-progress'] }
+    });
+
+    const completedJobsCount = await Booking.countDocuments({
+      workerId: user._id,
+      status: 'completed'
+    });
+
+    // Calculate total earnings (if Payment model exists)
+    let totalEarnings = 0;
+    try {
+      const Payment = require('../models/Payment');
+      const payments = await Payment.find({
+        workerId: user._id,
+        status: 'completed'
+      });
+      totalEarnings = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    } catch (err) {
+      console.log('ℹ️  Payment model not available, skipping earnings calculation');
+    }
+
+    const stats = {
+      pendingRequests: pendingRequestsCount,
+      activeJobs: activeJobsCount,
+      completedJobs: completedJobsCount,
+      totalEarnings: totalEarnings
+    };
+
+    console.log('📈 Stats calculated:', stats);
+
+    // Get recent bookings (both pending requests and accepted jobs)
+    const recentBookings = await Booking.find({
+      $or: [
+        { sentToWorkers: worker._id, status: { $in: ['quote_requested', 'pending'] } },
+        { workerId: user._id }
+      ]
+    })
+      .populate('customerId', 'fullName profileImage phoneNumber email')
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    console.log('📋 Found', recentBookings.length, 'recent bookings');
+
+    // Calculate profile completion percentage
+    const profileCompletion = calculateProfileCompletion(worker);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        stats,
+        recentBookings,
+        worker: {
+          id: worker._id,
+          userId: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          profileImage: user.profileImage,
+          completionRate: worker.completionRate || 0,
+          rating: worker.rating || 0,
+          totalReviews: worker.totalReviews || 0,
+          isVerified: worker.isVerified || false,
+          availability: worker.availability || true,
+          profileCompletion: profileCompletion,
+          serviceCategories: worker.serviceCategories || [],
+          bio: worker.bio || '',
+          experience: worker.experience || ''
+        }
+      }
+    });
+
+    console.log('✅ Dashboard data sent successfully');
+
+  } catch (error) {
+    console.error('❌ Error fetching dashboard:', error);
+    next(error);
+  }
+};
+
+/**
+ * Helper function to calculate profile completion percentage
+ */
+function calculateProfileCompletion(worker) {
+  let completedFields = 0;
+  const totalFields = 10;
+
+  // Check essential fields
+  if (worker.bio && worker.bio.length > 20) completedFields++;
+  if (worker.experience && worker.experience > 0) completedFields++;
+  if (worker.serviceCategories && worker.serviceCategories.length > 0) completedFields++;
+  if (worker.specializations && worker.specializations.length > 0) completedFields++;
+  if (worker.serviceAreas && worker.serviceAreas.length > 0) completedFields++;
+  if (worker.hourlyRate && worker.hourlyRate > 0) completedFields++;
+  if (worker.availability !== undefined) completedFields++;
+  if (worker.profileImage) completedFields++;
+  if (worker.portfolio && worker.portfolio.length > 0) completedFields++;
+  if (worker.certifications && worker.certifications.length > 0) completedFields++;
+
+  return Math.round((completedFields / totalFields) * 100);
+}

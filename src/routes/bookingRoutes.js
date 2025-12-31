@@ -54,6 +54,14 @@ router.get(
 router.get('/stats', authMiddleware, bookingController.getBookingStats);
 
 /**
+ * ✅ FIX: Add /my route for frontend compatibility
+ * @route   GET /bookings/my
+ * @desc    Get current user's bookings (role-based filtering)
+ * @access  Private
+ */
+router.get('/my', authMiddleware, bookingController.getBookings);
+
+/**
  * @route   GET /bookings
  * @desc    Get all bookings (with filters)
  * @access  Private

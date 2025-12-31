@@ -38,6 +38,19 @@ router.get(
 );
 
 /**
+ * ✅ FIX: Add dashboard route
+ * @route   GET /workers/dashboard
+ * @desc    Get worker dashboard data
+ * @access  Private/Worker
+ */
+router.get(
+  '/dashboard',
+  authMiddleware,
+  roleMiddleware(['worker']),
+  workerController.getDashboard
+);
+
+/**
  * ⭐ CRITICAL FIX: Worker's OWN profile (authenticated)
  * @route   GET /workers/profile
  * @desc    Get current worker's own profile
