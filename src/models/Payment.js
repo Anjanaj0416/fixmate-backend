@@ -294,10 +294,11 @@ paymentSchema.methods.resolveDispute = async function(resolution) {
 
 // Static methods
 paymentSchema.statics.getTotalEarnings = async function(workerId, startDate, endDate) {
+  // FIX: Use 'new' keyword with mongoose.Types.ObjectId for newer Mongoose versions
   const result = await this.aggregate([
     {
       $match: {
-        workerId: mongoose.Types.ObjectId(workerId),
+        workerId: new mongoose.Types.ObjectId(workerId),
         status: 'completed',
         completedAt: {
           $gte: startDate,
