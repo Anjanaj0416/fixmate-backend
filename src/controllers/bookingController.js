@@ -72,7 +72,7 @@ exports.getBookings = async (req, res, next) => {
     const { role, status, page = 1, limit = 20 } = req.query;
 
     const user = await User.findOne({ firebaseUid });
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -81,7 +81,7 @@ exports.getBookings = async (req, res, next) => {
     }
 
     const query = {};
-    
+
     // ✅ Filter by role
     if (role === 'customer') {
       query.customerId = user._id;
@@ -115,17 +115,33 @@ exports.getBookings = async (req, res, next) => {
 };
 
 /**
- * @desc    Get booking by ID
- * @route   GET /api/bookings/:id
- * @access  Private
+ * Get Booking By ID - Controller Method
+ * Add this to your bookingController.js if not already present
+ * 
+ * This ensures all required fields are populated for the booking details page
  */
+
 exports.getBookingById = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { firebaseUid } = req.user;
 
+    console.log('📋 Fetching booking by ID:', id);
+
+    // Find the current user
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Find the booking with all populated fields
     const booking = await Booking.findById(id)
-      .populate('customerId', 'fullName phoneNumber email profileImage location')
-      .populate('workerId', 'fullName phoneNumber email profileImage location');
+      .populate('customerId', 'fullName email phoneNumber profileImage')
+      .populate('workerId', 'fullName email phoneNumber profileImage')
+      .lean(); // Convert to plain JavaScript object for easier manipulation
 
     if (!booking) {
       return res.status(404).json({
@@ -134,11 +150,31 @@ exports.getBookingById = async (req, res, next) => {
       });
     }
 
+    // Authorization check - user must be either the customer or the worker
+    const isCustomer = booking.customerId &&
+      booking.customerId._id.toString() === user._id.toString();
+    const isWorker = booking.workerId &&
+      booking.workerId._id.toString() === user._id.toString();
+    const isAdmin = user.role === 'admin';
+
+    if (!isCustomer && !isWorker && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to view this booking'
+      });
+    }
+
+    console.log('✅ Booking found:', booking._id);
+
     res.status(200).json({
       success: true,
-      data: { booking }
+      data: {
+        booking
+      }
     });
+
   } catch (error) {
+    console.error('❌ Error fetching booking by ID:', error);
     next(error);
   }
 };
@@ -773,7 +809,7 @@ exports.sendQuoteToWorker = async (req, res, next) => {
     // ✅ Create notification for worker
     try {
       const workerUser = await User.findById(worker.userId);
-      
+
       // Send push notification if FCM token exists
       if (workerUser && workerUser.fcmToken) {
         const notificationPayload = {
@@ -1196,7 +1232,7 @@ exports.respondToQuoteRequest = async (req, res, next) => {
       res.status(200).json({
         success: true,
         message: 'Quote accepted and sent successfully',
-        data: { 
+        data: {
           booking,
           quote: newQuote
         }
