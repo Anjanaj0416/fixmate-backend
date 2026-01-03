@@ -111,11 +111,14 @@ exports.getConversation = async (req, res, next) => {
  * @desc    Get all conversations
  * @route   GET /api/chat/conversations
  * @access  Private
+ * ✅ FIXED: Added deduplication to prevent duplicate conversations
  */
 exports.getConversations = async (req, res, next) => {
   try {
     const { firebaseUid } = req.user;
     const user = await User.findOne({ firebaseUid });
+
+    console.log('📥 Getting conversations for user:', user._id);
 
     // Get all unique conversation partners
     const messages = await Message.aggregate([
@@ -156,6 +159,8 @@ exports.getConversations = async (req, res, next) => {
       }
     ]);
 
+    console.log('📊 Raw aggregation results:', messages.length);
+
     // Populate user details
     const conversations = await Promise.all(
       messages.map(async (conv) => {
@@ -176,11 +181,46 @@ exports.getConversations = async (req, res, next) => {
       })
     );
 
+    console.log('💬 Conversations before dedup:', conversations.length);
+
+    // ✅ CRITICAL FIX: Deduplicate conversations by conversationId
+    // This prevents duplicate conversations from being sent to frontend
+    const uniqueConversationsMap = new Map();
+    
+    conversations.forEach((conv) => {
+      const convId = conv.conversationId;
+      
+      // If we haven't seen this conversation yet, add it
+      if (!uniqueConversationsMap.has(convId)) {
+        uniqueConversationsMap.set(convId, conv);
+      } else {
+        // Compare timestamps and keep the one with more recent lastMessage
+        const existing = uniqueConversationsMap.get(convId);
+        const existingTime = new Date(existing.lastMessage?.timestamp || 0).getTime();
+        const currentTime = new Date(conv.lastMessage?.timestamp || 0).getTime();
+        
+        if (currentTime > existingTime) {
+          uniqueConversationsMap.set(convId, conv);
+          console.log(`🔄 Updated conversation ${convId} with more recent message`);
+        }
+      }
+    });
+
+    // Convert Map back to array
+    const uniqueConversations = Array.from(uniqueConversationsMap.values());
+    
+    console.log('✅ Conversations after dedup:', uniqueConversations.length);
+    console.log('🗑️ Duplicates removed:', conversations.length - uniqueConversations.length);
+
     res.status(200).json({
       success: true,
-      data: { conversations }
+      data: { 
+        conversations: uniqueConversations,
+        total: uniqueConversations.length
+      }
     });
   } catch (error) {
+    console.error('❌ Error in getConversations:', error);
     next(error);
   }
 };
