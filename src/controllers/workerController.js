@@ -125,9 +125,9 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distance in km
@@ -299,28 +299,68 @@ exports.removePortfolioImage = async (req, res, next) => {
 };
 
 /**
- * @desc    Update availability
+ * Update availability AND verification status
  * @route   PUT /api/workers/availability
  * @access  Private/Worker
+ * 
+ * ✅ UPDATED: Now also updates isVerified field
+ * When availability = true → isVerified = true
+ * When availability = false → isVerified = false
  */
 exports.updateAvailability = async (req, res, next) => {
   try {
     const { firebaseUid } = req.user;
-    const { availability } = req.body;
+    const { availability, isVerified } = req.body;
+
+    console.log('🔄 Updating worker availability and verification:', {
+      firebaseUid,
+      availability,
+      isVerified
+    });
 
     const user = await User.findOne({ firebaseUid });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // ✅ Update both availability AND isVerified
     const worker = await Worker.findOneAndUpdate(
       { userId: user._id },
-      { availability },
+      {
+        availability: availability,
+        isVerified: isVerified !== undefined ? isVerified : availability  // Default to availability value if not provided
+      },
       { new: true }
-    );
+    ).populate('userId', 'fullName email phoneNumber profileImage');
+
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker profile not found'
+      });
+    }
+
+    console.log('✅ Worker updated successfully:', {
+      workerId: worker._id,
+      availability: worker.availability,
+      isVerified: worker.isVerified
+    });
 
     res.status(200).json({
       success: true,
-      message: 'Availability updated successfully',
-      data: { availability: worker.availability }
+      message: 'Availability and verification status updated successfully',
+      data: {
+        availability: worker.availability,
+        isVerified: worker.isVerified,
+        worker: worker
+      }
     });
   } catch (error) {
+    console.error('❌ Error updating availability:', error);
     next(error);
   }
 };
@@ -556,7 +596,7 @@ exports.searchWorkers = async (req, res, next) => {
       const locationQuery = {};
       if (district) locationQuery['serviceAreas.district'] = district;
       if (town) locationQuery['serviceAreas.town'] = town;
-      
+
       // Match workers who serve the specified area
       Object.assign(query, locationQuery);
     }
