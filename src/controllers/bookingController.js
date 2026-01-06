@@ -380,7 +380,16 @@ exports.cancelBooking = async (req, res, next) => {
     const { reason } = req.body;
     const { firebaseUid, role } = req.user;
 
+    console.log('🗑️ Cancel booking request:', { id, reason, role });
+
     const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
     const booking = await Booking.findById(id);
 
     if (!booking) {
@@ -393,42 +402,67 @@ exports.cancelBooking = async (req, res, next) => {
     // Verify authorization
     const isAuthorized = (
       (role === 'customer' && booking.customerId.toString() === user._id.toString()) ||
-      (role === 'worker' && booking.workerId.toString() === user._id.toString())
+      (role === 'worker' && booking.workerId && booking.workerId.toString() === user._id.toString())
     );
 
     if (!isAuthorized) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: 'Unauthorized to cancel this booking'
       });
     }
 
+    // Update booking status
     booking.status = 'cancelled';
     booking.cancelledBy = role;
     booking.cancelledAt = new Date();
-    booking.cancellationReason = reason;
+    booking.cancellationReason = reason || 'No reason provided';
     await booking.save();
 
-    // Update customer stats
-    const customer = await Customer.findOne({ userId: booking.customerId });
-    await customer.incrementBookings(false, true);
+    console.log('✅ Booking status updated to cancelled');
 
-    // Notify the other party
+    // Update customer stats
+    try {
+      const customer = await Customer.findOne({ userId: booking.customerId });
+      if (customer) {
+        await customer.incrementBookings(false, true);
+        console.log('✅ Customer stats updated');
+      }
+    } catch (statsError) {
+      console.log('⚠️ Customer stats update failed (non-critical):', statsError.message);
+    }
+
+    // ✅ FIX: Only send notification if there's a worker assigned and it's valid
     const notifyUserId = role === 'customer' ? booking.workerId : booking.customerId;
-    await Notification.create({
-      userId: notifyUserId,
-      type: 'booking-cancelled',
-      title: 'Booking Cancelled',
-      message: `A booking has been cancelled. Reason: ${reason}`,
-      relatedBooking: booking._id
-    });
+
+    // Check if notifyUserId exists and is valid before creating notification
+    if (notifyUserId) {
+      try {
+        const Notification = require('../models/Notification');
+        await Notification.create({
+          userId: notifyUserId,
+          type: 'booking-cancelled',
+          title: 'Booking Cancelled',
+          message: `A booking has been cancelled. Reason: ${reason || 'No reason provided'}`,
+          relatedBooking: booking._id
+        });
+        console.log('✅ Notification sent to:', notifyUserId);
+      } catch (notifError) {
+        // Log but don't fail the request if notification fails
+        console.log('⚠️ Notification creation failed (non-critical):', notifError.message);
+      }
+    } else {
+      console.log('ℹ️ No worker assigned yet, skipping notification');
+    }
 
     res.status(200).json({
       success: true,
       message: 'Booking cancelled successfully',
       data: { booking }
     });
+
   } catch (error) {
+    console.error('❌ Error cancelling booking:', error);
     next(error);
   }
 };
