@@ -106,5 +106,28 @@ router.post(
 );
 
 
+/**
+ * ADD THIS ROUTE TO: fixmate-backend/src/routes/reviewRoutes.js
+ * 
+ * Add this route AFTER the existing routes, before module.exports
+ */
+
+/**
+ * @route   POST /api/reviews/rate-customer
+ * @desc    Worker rates a customer after completing a booking
+ * @access  Private/Worker
+ */
+router.post(
+  '/rate-customer',
+  authMiddleware,
+  roleMiddleware(['worker']),
+  validateRequest([
+    'body.bookingId',
+    'body.customerId',
+    'body.rating'
+  ]),
+  reviewController.rateCustomer
+);
+
 
 module.exports = router;

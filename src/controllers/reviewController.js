@@ -425,3 +425,160 @@ exports.getMyReviews = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * @desc    Worker rates a customer after completing a booking
+ * @route   POST /api/reviews/rate-customer
+ * @access  Private/Worker
+ * 
+ * ADD THIS METHOD TO: fixmate-backend/src/controllers/reviewController.js
+ */
+exports.rateCustomer = async (req, res, next) => {
+  try {
+    const { firebaseUid } = req.user;
+    const { bookingId, customerId, rating, comment } = req.body;
+
+    console.log('⭐ Worker rating customer:', {
+      bookingId,
+      customerId,
+      rating,
+      hasComment: !!comment
+    });
+
+    // Validate rating
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rating must be between 1 and 5'
+      });
+    }
+
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking ID is required'
+      });
+    }
+
+    // Get worker user
+    const User = require('../models/User');
+    const workerUser = await User.findOne({ firebaseUid });
+    if (!workerUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker user not found'
+      });
+    }
+
+    // Verify booking exists and worker completed it
+    const Booking = require('../models/Booking');
+    const booking = await Booking.findOne({
+      _id: bookingId,
+      workerId: workerUser._id,
+      status: 'completed'
+    });
+
+    if (!booking) {
+      console.warn('⚠️ Invalid booking or unauthorized rating attempt');
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid booking or you are not authorized to rate this customer. The job must be completed.'
+      });
+    }
+
+    console.log('📋 Booking verified:', booking._id);
+
+    // Check if worker already rated this customer for this booking
+    const Review = require('../models/Review');
+    const existingRating = await Review.findOne({
+      bookingId,
+      customerId,
+      workerId: workerUser._id,
+      reviewType: 'worker-to-customer' // To distinguish from customer-to-worker reviews
+    });
+
+    if (existingRating) {
+      console.warn('⚠️ Duplicate rating attempt');
+      return res.status(400).json({
+        success: false,
+        message: 'You have already rated this customer for this booking'
+      });
+    }
+
+    // Create the rating (using Review model with additional field)
+    const customerRating = await Review.create({
+      bookingId,
+      customerId,
+      workerId: workerUser._id,
+      rating: Number(rating),
+      comment: comment?.trim() || '',
+      reviewType: 'worker-to-customer', // New field to distinguish type
+      isVisible: true,
+      moderationStatus: 'approved',
+      serviceType: booking.serviceType,
+      createdAt: new Date()
+    });
+
+    console.log('✅ Customer rated successfully');
+
+    // Update customer's average rating
+    const Customer = require('../models/Customer');
+    const customer = await Customer.findOne({ userId: customerId });
+    
+    if (customer) {
+      // Calculate new average rating for customer
+      const allCustomerRatings = await Review.find({
+        customerId,
+        reviewType: 'worker-to-customer',
+        isVisible: true
+      });
+
+      const totalRatings = allCustomerRatings.length;
+      const sumRatings = allCustomerRatings.reduce((sum, r) => sum + r.rating, 0);
+      const newAverageRating = Math.round((sumRatings / totalRatings) * 10) / 10;
+
+      // Update customer rating (if Customer model has rating field)
+      // Note: You may need to add a 'rating' field to Customer model
+      customer.averageRating = newAverageRating;
+      customer.totalRatings = totalRatings;
+      await customer.save();
+
+      console.log('📊 Customer rating updated:', {
+        average: newAverageRating,
+        total: totalRatings
+      });
+    }
+
+    // Create notification for customer
+    try {
+      const Notification = require('../models/Notification');
+      await Notification.create({
+        userId: customerId,
+        type: 'rating-received',
+        title: 'New Rating from Worker',
+        message: `You received a ${rating}-star rating from ${workerUser.fullName}`,
+        relatedBooking: bookingId,
+        relatedUser: workerUser._id
+      });
+      console.log('✅ Notification created');
+    } catch (notifError) {
+      console.warn('⚠️ Failed to create notification:', notifError.message);
+      // Don't fail the request if notification fails
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Customer rated successfully',
+      data: {
+        rating: customerRating.rating,
+        comment: customerRating.comment,
+        createdAt: customerRating.createdAt,
+        customerAverageRating: customer?.averageRating || null,
+        customerTotalRatings: customer?.totalRatings || null
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error rating customer:', error);
+    next(error);
+  }
+};

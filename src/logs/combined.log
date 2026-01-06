@@ -6326,3 +6326,95 @@
 {"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 12:53:09"}
 {"level":"info","message":"📨 GET /bookings/695b824b03d15cff1bef5147 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 12:53:28"}
 {"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 12:53:30"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 12:56:07"}
+{"level":"info","message":"📨 POST /auth/verify-token (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:10"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:10"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:16"}
+{"level":"info","message":"📨 GET /chat/conversations/695b436383de110ea0be5db2 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:33"}
+{"level":"info","message":"📨 GET /workers/695b436383de110ea0be5db2/profile (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:34"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:34"}
+{"level":"info","message":"📨 GET /chat/conversations/695b436383de110ea0be5db2 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:38"}
+{"level":"info","message":"📨 GET /workers/695b436383de110ea0be5db2/profile (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:38"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:39"}
+{"level":"info","message":"📨 POST /chat/messages (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:42"}
+{"level":"info","message":"📨 GET /chat/conversations/695b436383de110ea0be5db2 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:43"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:44"}
+{"level":"info","message":"📨 GET /chat/conversations/695b436383de110ea0be5db2 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:48"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:49"}
+{"level":"info","message":"📨 GET /chat/conversations/695b436383de110ea0be5db2 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:53"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:54"}
+{"level":"info","message":"📨 GET /chat/conversations (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:57"}
+{"level":"info","message":"📨 GET /chat/conversations/695b436383de110ea0be5db2 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:51:59"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:52:00"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:52:00"}
+{"level":"info","message":"📨 GET /bookings/695b824b03d15cff1bef5147 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:53:15"}
+{"level":"info","message":"📨 GET /reviews/booking/695b824b03d15cff1bef5147 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:53:15"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:53:16"}
+{"level":"info","message":"📨 GET /bookings/stats (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:53:17"}
+{"level":"info","message":"📨 GET /bookings/stats (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:53:20"}
+{"level":"info","message":"📨 POST /auth/logout (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:53:23"}
+{"level":"info","message":"📨 POST /auth/login (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:53:35"}
+{"level":"info","message":"📨 GET /workers/profile (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:53:35"}
+{"level":"info","message":"📨 GET /workers/dashboard (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:53:36"}
+{"level":"info","message":"📨 GET /bookings/received-quotes (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:53:46"}
+{"level":"info","message":"📨 PUT /bookings/695b51db03d15cff1bef5060/respond (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:01"}
+{"level":"info","message":"📨 GET /bookings/received-quotes (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:05"}
+{"level":"info","message":"📨 GET /chat/conversations/695b42b483de110ea0be5d81 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:09"}
+{"level":"info","message":"📨 GET /users/695b42b483de110ea0be5d81 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:10"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:10"}
+{"level":"info","message":"📨 GET /chat/conversations/695b42b483de110ea0be5d81 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:14"}
+{"level":"info","message":"📨 GET /users/695b42b483de110ea0be5d81 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:15"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:15"}
+{"level":"info","message":"📨 POST /chat/messages (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:18"}
+{"level":"info","message":"📨 GET /chat/conversations/695b42b483de110ea0be5d81 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:19"}
+{"level":"info","message":"📨 GET /chat/conversations/695b42b483de110ea0be5d81 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:20"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:20"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:20"}
+{"level":"info","message":"📨 GET /chat/conversations/695b42b483de110ea0be5d81 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:24"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:25"}
+{"level":"info","message":"📨 GET /chat/conversations/695b42b483de110ea0be5d81 (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:29"}
+{"level":"info","message":"📨 GET /chat/conversations (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:29"}
+{"level":"info","message":"📨 PUT /chat/messages/read (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:30"}
+{"level":"info","message":"📨 GET /workers/profile (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:31"}
+{"level":"info","message":"📨 GET /workers/dashboard (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:31"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 13:54:36"}
+{"level":"info","message":"📨 POST /auth/verify-token (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 14:07:37"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 14:07:37"}
+{"level":"info","message":"Mongoose default connection is disconnected","service":"fixmate-api","timestamp":"2026-01-06 14:07:37"}
+{"level":"warn","message":"Mongoose disconnected from MongoDB","service":"fixmate-api","timestamp":"2026-01-06 14:07:37"}
+{"level":"info","message":"Mongoose default connection is open","service":"fixmate-api","timestamp":"2026-01-06 14:07:38"}
+{"level":"info","message":"Mongoose connected to MongoDB","service":"fixmate-api","timestamp":"2026-01-06 14:07:38"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 14:54:55"}
+{"level":"info","message":"📨 GET /bookings (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 14:54:56"}
+{"level":"info","message":"📨 GET /bookings/worker (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 14:54:56"}
+{"level":"info","message":"Mongoose default connection is disconnected","service":"fixmate-api","timestamp":"2026-01-06 18:32:27"}
+{"level":"warn","message":"Mongoose disconnected from MongoDB","service":"fixmate-api","timestamp":"2026-01-06 18:32:27"}
+{"level":"info","message":"Mongoose default connection is open","service":"fixmate-api","timestamp":"2026-01-06 18:32:27"}
+{"level":"info","message":"Mongoose connected to MongoDB","service":"fixmate-api","timestamp":"2026-01-06 18:32:27"}
+{"level":"info","message":"Starting FixMate Backend Server...","service":"fixmate-api","timestamp":"2026-01-06 18:48:09"}
+{"level":"info","message":"Environment: development","service":"fixmate-api","timestamp":"2026-01-06 18:48:09"}
+{"level":"info","message":"Connecting to MongoDB...","service":"fixmate-api","timestamp":"2026-01-06 18:48:09"}
+{"level":"info","message":"Mongoose default connection is open","service":"fixmate-api","timestamp":"2026-01-06 18:48:11"}
+{"level":"info","message":"MongoDB Connected: ac-xisigml-shard-00-00.5aysnp1.mongodb.net","service":"fixmate-api","timestamp":"2026-01-06 18:48:11"}
+{"level":"info","message":"Database Name: test","service":"fixmate-api","timestamp":"2026-01-06 18:48:11"}
+{"level":"info","message":"✅ MongoDB connected successfully","service":"fixmate-api","timestamp":"2026-01-06 18:48:11"}
+{"level":"info","message":"Initializing Firebase Admin SDK...","service":"fixmate-api","timestamp":"2026-01-06 18:48:11"}
+{"level":"info","message":"Firebase Admin SDK initialized successfully","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"Project ID: fixamte-df879","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"✅ Firebase Admin SDK initialized successfully","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"Checking Cloudinary configuration...","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"Cloudinary initialized successfully","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"Cloud Name: your_cloud_name","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"✅ Cloudinary initialized successfully","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"All services initialized successfully","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"==================================================","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"🚀 FixMate Server running in development mode","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"📡 Server listening on port 5001","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"🌐 API URL: http://localhost:5001","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"💚 Health check: http://localhost:5001/health","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"==================================================","service":"fixmate-api","timestamp":"2026-01-06 18:48:12"}
+{"level":"info","message":"📨 POST /auth/verify-token (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 18:48:24"}
+{"level":"info","message":"📨 POST /auth/login (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 18:48:40"}
+{"level":"info","message":"📨 GET /workers/profile (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 18:48:40"}
+{"level":"info","message":"📨 GET /workers/dashboard (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 18:48:45"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-06 18:49:53"}
