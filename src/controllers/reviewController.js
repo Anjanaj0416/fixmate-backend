@@ -1,4 +1,8 @@
-const { Review, Booking, Worker, Notification } = require('../models');
+const Review = require('../models/Review');
+const Booking = require('../models/Booking');
+const Worker = require('../models/Worker');
+const User = require('../models/User');
+const Notification = require('../models/Notification');
 
 /**
  * @desc    Create a review
@@ -579,6 +583,309 @@ exports.rateCustomer = async (req, res, next) => {
     });
   } catch (error) {
     console.error('❌ Error rating customer:', error);
+    next(error);
+  }
+};
+
+/**
+ * @desc    Create a review (UPDATED VERSION with image handling)
+ * @route   POST /api/v1/reviews
+ * @access  Private/Customer
+ */
+exports.createReview = async (req, res, next) => {
+  try {
+    const { firebaseUid } = req.user;
+    
+    console.log('📝 Creating review - Request body:', req.body);
+    console.log('📝 Files:', req.files);
+
+    const {
+      bookingId,
+      workerId,
+      rating,
+      comment,
+      detailedRatings,
+      wouldRecommend
+    } = req.body;
+
+    // Validate required fields
+    if (!bookingId || !workerId || !rating || !comment) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: bookingId, workerId, rating, and comment are required'
+      });
+    }
+
+    // Validate rating
+    const ratingNum = parseInt(rating);
+    if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rating must be a number between 1 and 5'
+      });
+    }
+
+    const customer = await User.findOne({ firebaseUid });
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer not found'
+      });
+    }
+
+    // Verify booking exists and is completed
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found'
+      });
+    }
+
+    if (booking.status !== 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Can only review completed bookings'
+      });
+    }
+
+    if (booking.customerId.toString() !== customer._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized - You can only review your own bookings'
+      });
+    }
+
+    // Check if review already exists
+    const existingReview = await Review.findOne({ bookingId });
+    if (existingReview) {
+      return res.status(400).json({
+        success: false,
+        message: 'Review already exists for this booking'
+      });
+    }
+
+    // Process images if provided
+    let imageUrls = [];
+    if (req.files && req.files.length > 0) {
+      console.log(`📸 Processing ${req.files.length} review images`);
+      
+      // Store file paths (in production, upload to Cloudinary)
+      imageUrls = req.files.map(file => ({
+        imageUrl: `/uploads/reviews/${file.filename}`,
+        caption: ''
+      }));
+    }
+
+    // Parse detailed ratings if provided
+    let parsedDetailedRatings = null;
+    if (detailedRatings) {
+      try {
+        parsedDetailedRatings = typeof detailedRatings === 'string' 
+          ? JSON.parse(detailedRatings) 
+          : detailedRatings;
+      } catch (err) {
+        console.warn('⚠️ Failed to parse detailedRatings:', err);
+      }
+    }
+
+    // Create review
+    const review = await Review.create({
+      bookingId,
+      customerId: customer._id,
+      workerId,
+      rating: ratingNum,
+      comment: comment.trim(),
+      detailedRatings: parsedDetailedRatings,
+      images: imageUrls,
+      wouldRecommend: wouldRecommend === 'true' || wouldRecommend === true,
+      serviceType: booking.serviceType
+    });
+
+    console.log('✅ Review created successfully:', review._id);
+
+    // Populate the review for response
+    const populatedReview = await Review.findById(review._id)
+      .populate('customerId', 'fullName profileImage')
+      .populate('workerId', 'fullName profileImage')
+      .populate('bookingId', 'serviceType completedAt');
+
+    // Update worker's rating
+    const worker = await Worker.findOne({ userId: workerId });
+    if (worker) {
+      // Recalculate average rating
+      const allReviews = await Review.find({ 
+        workerId,
+        isVisible: true,
+        moderationStatus: 'approved'
+      });
+      
+      const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
+      const avgRating = allReviews.length > 0 ? totalRating / allReviews.length : 0;
+      
+      worker.rating = {
+        average: avgRating,
+        count: allReviews.length
+      };
+      await worker.save();
+      
+      console.log(`✅ Updated worker rating: ${avgRating.toFixed(2)} (${allReviews.length} reviews)`);
+    }
+
+    // Send notification to worker
+    try {
+      await Notification.create({
+        userId: workerId,
+        type: 'review-received',
+        title: 'New Review Received',
+        message: `You received a ${ratingNum}-star review from ${customer.fullName}`,
+        relatedReview: review._id,
+        relatedUser: customer._id
+      });
+      console.log('✅ Notification sent to worker');
+    } catch (notifError) {
+      console.warn('⚠️ Failed to send notification:', notifError);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Review submitted successfully',
+      data: { review: populatedReview }
+    });
+  } catch (error) {
+    console.error('❌ Error creating review:', error);
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get review for a specific booking
+ * @route   GET /api/v1/reviews/booking/:bookingId
+ * @access  Private
+ */
+exports.getBookingReview = async (req, res, next) => {
+  try {
+    const { bookingId } = req.params;
+    const { firebaseUid } = req.user;
+
+    console.log('📋 Getting review for booking:', bookingId);
+
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Find review for this booking
+    const review = await Review.findOne({ bookingId })
+      .populate('customerId', 'fullName profileImage email')
+      .populate('workerId', 'fullName profileImage email')
+      .populate('bookingId', 'serviceType completedAt');
+
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: 'No review found for this booking'
+      });
+    }
+
+    // Verify user has access to this review
+    const hasAccess = 
+      review.customerId._id.toString() === user._id.toString() ||
+      review.workerId._id.toString() === user._id.toString();
+
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to this review'
+      });
+    }
+
+    console.log('✅ Review found:', review._id);
+
+    res.status(200).json({
+      success: true,
+      data: { review }
+    });
+  } catch (error) {
+    console.error('❌ Error getting booking review:', error);
+    next(error);
+  }
+};
+
+/**
+ * @desc    Check if booking can be reviewed
+ * @route   GET /api/v1/reviews/booking/:bookingId/can-review
+ * @access  Private
+ */
+exports.canReviewBooking = async (req, res, next) => {
+  try {
+    const { bookingId } = req.params;
+    const { firebaseUid } = req.user;
+
+    console.log('🔍 Checking if booking can be reviewed:', bookingId);
+
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Get booking
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found',
+        canReview: false
+      });
+    }
+
+    // Check if user is the customer
+    const isCustomer = booking.customerId.toString() === user._id.toString();
+    if (!isCustomer) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the customer can review this booking',
+        canReview: false
+      });
+    }
+
+    // Check if booking is completed
+    if (booking.status !== 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking must be completed before reviewing',
+        canReview: false
+      });
+    }
+
+    // Check if review already exists
+    const existingReview = await Review.findOne({ bookingId });
+    if (existingReview) {
+      return res.status(200).json({
+        success: true,
+        message: 'Review already exists for this booking',
+        canReview: false,
+        hasReview: true,
+        review: existingReview
+      });
+    }
+
+    console.log('✅ Booking can be reviewed');
+
+    res.status(200).json({
+      success: true,
+      message: 'Booking can be reviewed',
+      canReview: true,
+      hasReview: false
+    });
+  } catch (error) {
+    console.error('❌ Error checking review eligibility:', error);
     next(error);
   }
 };

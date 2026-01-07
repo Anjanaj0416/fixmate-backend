@@ -4,9 +4,45 @@ const reviewController = require('../controllers/reviewController');
 const { authMiddleware } = require('../middleware/authMiddleware');
 const { roleMiddleware } = require('../middleware/roleMiddleware');
 const { validateRequest } = require('../middleware/validator');
+const multer = require('multer');
+const path = require('path');
+
+// ============================================
+// MULTER CONFIGURATION FOR IMAGE UPLOADS
+// ============================================
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/reviews/');
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'review-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  // Accept images only
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'), false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB max file size
+  }
+});
+
+// ============================================
+// REVIEW ROUTES
+// ============================================
 
 /**
- * @route   POST /api/reviews
+ * @route   POST /api/v1/reviews
  * @desc    Create a review
  * @access  Private/Customer
  */
@@ -14,17 +50,12 @@ router.post(
   '/',
   authMiddleware,
   roleMiddleware(['customer']),
-  validateRequest([
-    'body.bookingId',
-    'body.workerId',
-    'body.rating',
-    'body.comment'
-  ]),
+  upload.array('images', 5), // Allow up to 5 images
   reviewController.createReview
 );
 
 /**
- * @route   GET /api/reviews/my-reviews
+ * @route   GET /api/v1/reviews/my-reviews
  * @desc    Get customer's reviews
  * @access  Private/Customer
  */
@@ -36,21 +67,43 @@ router.get(
 );
 
 /**
- * @route   GET /api/reviews/worker/:workerId
+ * @route   GET /api/v1/reviews/worker/:workerId
  * @desc    Get reviews for a worker
  * @access  Public
  */
 router.get('/worker/:workerId', reviewController.getWorkerReviews);
 
 /**
- * @route   GET /api/reviews/:id
+ * @route   GET /api/v1/reviews/booking/:bookingId
+ * @desc    Get review for a specific booking
+ * @access  Private
+ */
+router.get(
+  '/booking/:bookingId',
+  authMiddleware,
+  reviewController.getBookingReview
+);
+
+/**
+ * @route   GET /api/v1/reviews/booking/:bookingId/can-review
+ * @desc    Check if booking can be reviewed
+ * @access  Private
+ */
+router.get(
+  '/booking/:bookingId/can-review',
+  authMiddleware,
+  reviewController.canReviewBooking
+);
+
+/**
+ * @route   GET /api/v1/reviews/:id
  * @desc    Get review by ID
  * @access  Public
  */
 router.get('/:id', reviewController.getReviewById);
 
 /**
- * @route   PUT /api/reviews/:id
+ * @route   PUT /api/v1/reviews/:id
  * @desc    Update review
  * @access  Private/Customer
  */
@@ -62,7 +115,7 @@ router.put(
 );
 
 /**
- * @route   DELETE /api/reviews/:id
+ * @route   DELETE /api/v1/reviews/:id
  * @desc    Delete review
  * @access  Private/Customer
  */
@@ -74,7 +127,7 @@ router.delete(
 );
 
 /**
- * @route   POST /api/reviews/:id/response
+ * @route   POST /api/v1/reviews/:id/response
  * @desc    Worker response to review
  * @access  Private/Worker
  */
@@ -87,14 +140,14 @@ router.post(
 );
 
 /**
- * @route   POST /api/reviews/:id/helpful
+ * @route   POST /api/v1/reviews/:id/helpful
  * @desc    Mark review as helpful
  * @access  Private
  */
 router.post('/:id/helpful', authMiddleware, reviewController.markHelpful);
 
 /**
- * @route   POST /api/reviews/:id/flag
+ * @route   POST /api/v1/reviews/:id/flag
  * @desc    Flag review for moderation
  * @access  Private
  */
@@ -105,15 +158,8 @@ router.post(
   reviewController.flagReview
 );
 
-
 /**
- * ADD THIS ROUTE TO: fixmate-backend/src/routes/reviewRoutes.js
- * 
- * Add this route AFTER the existing routes, before module.exports
- */
-
-/**
- * @route   POST /api/reviews/rate-customer
+ * @route   POST /api/v1/reviews/rate-customer
  * @desc    Worker rates a customer after completing a booking
  * @access  Private/Worker
  */
@@ -128,6 +174,5 @@ router.post(
   ]),
   reviewController.rateCustomer
 );
-
 
 module.exports = router;
