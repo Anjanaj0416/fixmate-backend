@@ -5,8 +5,8 @@ const userSchema = new mongoose.Schema({
   firebaseUid: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
+    // ✅ REMOVED: index: true (unique already creates index)
   },
   
   // Basic Information
@@ -111,8 +111,9 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes
+// ✅ FIXED: Indexes
 // NOTE: email and firebaseUid already have unique: true which creates indexes
+// Only add compound and geospatial indexes here
 userSchema.index({ 'location.coordinates': '2dsphere' });
 userSchema.index({ role: 1 });
 userSchema.index({ accountStatus: 1 });

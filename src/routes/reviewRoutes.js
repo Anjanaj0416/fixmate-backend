@@ -4,58 +4,42 @@ const reviewController = require('../controllers/reviewController');
 const { authMiddleware } = require('../middleware/authMiddleware');
 const { roleMiddleware } = require('../middleware/roleMiddleware');
 const { validateRequest } = require('../middleware/validator');
-const multer = require('multer');
-const path = require('path');
-
-// ============================================
-// MULTER CONFIGURATION FOR IMAGE UPLOADS
-// ============================================
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/reviews/');
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'review-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const fileFilter = (req, file, cb) => {
-  // Accept images only
-  if (file.mimetype.startsWith('image/')) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only image files are allowed!'), false);
-  }
-};
-
-const upload = multer({ 
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB max file size
-  }
-});
-
-// ============================================
-// REVIEW ROUTES
-// ============================================
+const { uploadReviewImages } = require('../middleware/upload'); // ✅ ADD THIS
 
 /**
- * @route   POST /api/v1/reviews
- * @desc    Create a review
+ * @route   POST /api/reviews
+ * @desc    Create a review with images
  * @access  Private/Customer
+ * 
+ * ✅ FIXED: Added uploadReviewImages middleware to handle file uploads
  */
 router.post(
   '/',
   authMiddleware,
   roleMiddleware(['customer']),
-  upload.array('images', 5), // Allow up to 5 images
+  uploadReviewImages, // ✅ ADD THIS MIDDLEWARE BEFORE VALIDATION
+  validateRequest([
+    'body.bookingId',
+    'body.workerId',
+    'body.rating',
+    'body.comment'
+  ]),
   reviewController.createReview
 );
 
 /**
- * @route   GET /api/v1/reviews/my-reviews
+ * @route   GET /api/reviews/booking/:bookingId
+ * @desc    Get review for a specific booking
+ * @access  Private
+ */
+router.get(
+  '/booking/:bookingId',
+  authMiddleware,
+  reviewController.getBookingReview
+);
+
+/**
+ * @route   GET /api/reviews/my-reviews
  * @desc    Get customer's reviews
  * @access  Private/Customer
  */
@@ -67,43 +51,21 @@ router.get(
 );
 
 /**
- * @route   GET /api/v1/reviews/worker/:workerId
+ * @route   GET /api/reviews/worker/:workerId
  * @desc    Get reviews for a worker
  * @access  Public
  */
 router.get('/worker/:workerId', reviewController.getWorkerReviews);
 
 /**
- * @route   GET /api/v1/reviews/booking/:bookingId
- * @desc    Get review for a specific booking
- * @access  Private
- */
-router.get(
-  '/booking/:bookingId',
-  authMiddleware,
-  reviewController.getBookingReview
-);
-
-/**
- * @route   GET /api/v1/reviews/booking/:bookingId/can-review
- * @desc    Check if booking can be reviewed
- * @access  Private
- */
-router.get(
-  '/booking/:bookingId/can-review',
-  authMiddleware,
-  reviewController.canReviewBooking
-);
-
-/**
- * @route   GET /api/v1/reviews/:id
+ * @route   GET /api/reviews/:id
  * @desc    Get review by ID
  * @access  Public
  */
 router.get('/:id', reviewController.getReviewById);
 
 /**
- * @route   PUT /api/v1/reviews/:id
+ * @route   PUT /api/reviews/:id
  * @desc    Update review
  * @access  Private/Customer
  */
@@ -111,11 +73,12 @@ router.put(
   '/:id',
   authMiddleware,
   roleMiddleware(['customer']),
+  uploadReviewImages, // ✅ ADD THIS for image updates too
   reviewController.updateReview
 );
 
 /**
- * @route   DELETE /api/v1/reviews/:id
+ * @route   DELETE /api/reviews/:id
  * @desc    Delete review
  * @access  Private/Customer
  */
@@ -127,7 +90,7 @@ router.delete(
 );
 
 /**
- * @route   POST /api/v1/reviews/:id/response
+ * @route   POST /api/reviews/:id/response
  * @desc    Worker response to review
  * @access  Private/Worker
  */
@@ -140,14 +103,14 @@ router.post(
 );
 
 /**
- * @route   POST /api/v1/reviews/:id/helpful
+ * @route   POST /api/reviews/:id/helpful
  * @desc    Mark review as helpful
  * @access  Private
  */
 router.post('/:id/helpful', authMiddleware, reviewController.markHelpful);
 
 /**
- * @route   POST /api/v1/reviews/:id/flag
+ * @route   POST /api/reviews/:id/flag
  * @desc    Flag review for moderation
  * @access  Private
  */
@@ -159,7 +122,7 @@ router.post(
 );
 
 /**
- * @route   POST /api/v1/reviews/rate-customer
+ * @route   POST /api/reviews/rate-customer
  * @desc    Worker rates a customer after completing a booking
  * @access  Private/Worker
  */

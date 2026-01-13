@@ -7,12 +7,14 @@ const customerSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
     unique: true
+    // ✅ REMOVED: index: true (unique already creates index)
   },
   
   firebaseUid: {
     type: String,
     required: true,
     unique: true
+    // ✅ REMOVED: index: true (unique already creates index)
   },
   
   // Customer Preferences
@@ -73,8 +75,8 @@ const customerSchema = new mongoose.Schema({
       },
       coordinates: {
         type: [Number], // [longitude, latitude]
-        required: false,  // ✅ FIXED: Made optional to prevent empty array errors
-        default: undefined  // ✅ FIXED: Undefined prevents geospatial index errors
+        required: false,
+        default: undefined
       }
     },
     isDefault: {
@@ -133,40 +135,40 @@ const customerSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes
+// ✅ FIXED: Indexes
 // NOTE: userId and firebaseUid already have unique: true which creates indexes
-
-// ✅ FIXED: Added sparse option to geospatial index
-// This allows documents without coordinates to be saved without errors
-customerSchema.index({ 
-  'savedAddresses.coordinates': '2dsphere' 
-}, { 
-  sparse: true  // ✅ Only indexes documents that have coordinates field
-});
+// Only add compound indexes here if needed
+customerSchema.index({ totalBookings: -1 });
+customerSchema.index({ completedBookings: -1 });
 
 // Methods
-customerSchema.methods.addFavoriteWorker = async function(workerId) {
-  const exists = this.favoriteWorkers.some(
-    fav => fav.workerId.toString() === workerId.toString()
-  );
+customerSchema.methods.updateBookingStats = async function() {
+  const Booking = require('./Booking');
   
-  if (!exists) {
-    this.favoriteWorkers.push({ workerId, addedAt: new Date() });
-    await this.save();
-  }
-};
+  const stats = await Booking.aggregate([
+    { $match: { customerId: this.userId } },
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
 
-customerSchema.methods.removeFavoriteWorker = async function(workerId) {
-  this.favoriteWorkers = this.favoriteWorkers.filter(
-    fav => fav.workerId.toString() !== workerId.toString()
-  );
-  await this.save();
-};
+  let totalBookings = 0;
+  let completedBookings = 0;
+  let cancelledBookings = 0;
 
-customerSchema.methods.incrementBookings = async function(completed = false, cancelled = false) {
-  this.totalBookings += 1;
-  if (completed) this.completedBookings += 1;
-  if (cancelled) this.cancelledBookings += 1;
+  stats.forEach(stat => {
+    totalBookings += stat.count;
+    if (stat._id === 'completed') completedBookings = stat.count;
+    if (stat._id === 'cancelled') cancelledBookings = stat.count;
+  });
+
+  this.totalBookings = totalBookings;
+  this.completedBookings = completedBookings;
+  this.cancelledBookings = cancelledBookings;
+
   await this.save();
 };
 
