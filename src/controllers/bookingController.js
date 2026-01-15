@@ -181,8 +181,10 @@ exports.getBookingById = async (req, res, next) => {
 
 /**
  * @desc    Update booking status
- * @route   PUT /api/bookings/:id/status
+ * @route   PUT /bookings/:id/status
  * @access  Private
+ * 
+ * ✅ FIXED: Proper null checks and error handling for Worker/Customer stats
  */
 exports.updateBookingStatus = async (req, res, next) => {
   try {
@@ -190,9 +192,19 @@ exports.updateBookingStatus = async (req, res, next) => {
     const { status } = req.body;
     const { firebaseUid, role } = req.user;
 
-    const user = await User.findOne({ firebaseUid });
-    const booking = await Booking.findById(id);
+    console.log('📝 Updating booking status:', { id, status, role });
 
+    // Find user
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Find booking
+    const booking = await Booking.findById(id);
     if (!booking) {
       return res.status(404).json({
         success: false,
@@ -200,34 +212,50 @@ exports.updateBookingStatus = async (req, res, next) => {
       });
     }
 
+    console.log('📋 Found booking:', {
+      bookingId: booking._id,
+      currentStatus: booking.status,
+      requestedStatus: status,
+      customerId: booking.customerId,
+      workerId: booking.workerId
+    });
+
     // Verify authorization
     if (role === 'customer' && booking.customerId.toString() !== user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: 'Unauthorized - Not your booking'
       });
     }
 
-    if (role === 'worker' && booking.workerId.toString() !== user._id.toString()) {
+    if (role === 'worker' && booking.workerId && booking.workerId.toString() !== user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Unauthorized'
+        message: 'Unauthorized - Not assigned to you'
       });
     }
 
+    // Update booking status using the model method
     await booking.updateStatus(status, user._id, role);
+
+    console.log('✅ Booking status updated to:', status);
 
     // Handle status-specific logic
     if (status === 'accepted') {
       // Notify customer
-      await Notification.create({
-        userId: booking.customerId,
-        type: 'booking-accepted',
-        title: 'Booking Accepted',
-        message: 'Your booking request has been accepted',
-        relatedBooking: booking._id,
-        relatedUser: booking.workerId
-      });
+      try {
+        await Notification.create({
+          userId: booking.customerId,
+          type: 'booking-accepted',
+          title: 'Booking Accepted',
+          message: 'Your booking request has been accepted',
+          relatedBooking: booking._id,
+          relatedUser: booking.workerId
+        });
+        console.log('✅ Notification sent to customer');
+      } catch (notifError) {
+        console.log('⚠️ Notification creation failed (non-critical):', notifError.message);
+      }
 
       // Update worker response
       booking.workerResponse = {
@@ -235,31 +263,85 @@ exports.updateBookingStatus = async (req, res, next) => {
         action: 'accepted'
       };
       await booking.save();
+
     } else if (status === 'completed') {
-      // Update worker stats
-      const worker = await Worker.findOne({ userId: booking.workerId });
-      await worker.incrementCompletedJobs();
+      console.log('🏁 Processing completion logic...');
 
-      // Update customer stats
-      const customer = await Customer.findOne({ userId: booking.customerId });
-      await customer.incrementBookings(true);
+      // ✅ FIX: Update worker stats with proper null checks
+      if (booking.workerId) {
+        try {
+          const Worker = require('../models/Worker');
+          const worker = await Worker.findOne({ userId: booking.workerId });
 
-      // Notify customer
-      await Notification.create({
-        userId: booking.customerId,
-        type: 'booking-completed',
-        title: 'Job Completed',
-        message: 'Your job has been marked as completed. Please leave a review.',
-        relatedBooking: booking._id
-      });
+          if (worker) {
+            await worker.incrementCompletedJobs();
+            console.log('✅ Worker stats updated successfully');
+          } else {
+            console.log('⚠️ Worker profile not found for userId:', booking.workerId);
+          }
+        } catch (workerError) {
+          console.error('❌ Error updating worker stats:', workerError.message);
+          // Don't throw - this is non-critical
+        }
+      } else {
+        console.log('⚠️ No workerId found on booking - skipping worker stats update');
+      }
+
+      // ✅ FIX: Update customer stats with proper null checks
+      if (booking.customerId) {
+        try {
+          const Customer = require('../models/Customer');
+          const customer = await Customer.findOne({ userId: booking.customerId });
+
+          if (customer) {
+            await customer.incrementBookings(true);
+            console.log('✅ Customer stats updated successfully');
+          } else {
+            console.log('⚠️ Customer profile not found for userId:', booking.customerId);
+          }
+        } catch (customerError) {
+          console.error('❌ Error updating customer stats:', customerError.message);
+          // Don't throw - this is non-critical
+        }
+      } else {
+        console.log('⚠️ No customerId found on booking - skipping customer stats update');
+      }
+
+      // ✅ FIX: Notify customer with proper null check
+      if (booking.customerId) {
+        try {
+          await Notification.create({
+            userId: booking.customerId,
+            type: 'booking-completed',
+            title: 'Job Completed',
+            message: 'Your job has been marked as completed. Please leave a review.',
+            relatedBooking: booking._id
+          });
+          console.log('✅ Completion notification sent to customer');
+        } catch (notifError) {
+          console.error('❌ Error creating notification:', notifError.message);
+          // Don't throw - this is non-critical
+        }
+      }
+
+      console.log('✅ Completion logic finished successfully');
     }
+
+    // Re-fetch booking with populated fields for response
+    const updatedBooking = await Booking.findById(booking._id)
+      .populate('customerId', 'fullName email phoneNumber profileImage')
+      .populate('workerId', 'fullName email phoneNumber profileImage');
 
     res.status(200).json({
       success: true,
       message: 'Booking status updated successfully',
-      data: { booking }
+      data: {
+        booking: updatedBooking
+      }
     });
+
   } catch (error) {
+    console.error('❌ Error in updateBookingStatus:', error);
     next(error);
   }
 };
