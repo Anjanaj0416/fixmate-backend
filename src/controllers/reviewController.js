@@ -33,7 +33,7 @@ exports.createReview = async (req, res, next) => {
     // Get customer user
     const User = require('../models/User');
     const customer = await User.findOne({ firebaseUid });
-    
+
     if (!customer) {
       return res.status(404).json({
         success: false,
@@ -68,21 +68,21 @@ exports.createReview = async (req, res, next) => {
     const images = [];
     if (req.files && req.files.length > 0) {
       console.log(`📸 Processing ${req.files.length} images`);
-      
+
       // Check if Cloudinary is configured AND has valid credentials
       let useCloudinary = isCloudinaryConfigured();
-      
+
       // Validate Cloudinary credentials aren't placeholders
       if (useCloudinary) {
         if (process.env.CLOUDINARY_CLOUD_NAME === 'your_cloud_name' ||
-            process.env.CLOUDINARY_API_KEY === 'your_api_key' ||
-            !process.env.CLOUDINARY_CLOUD_NAME ||
-            !process.env.CLOUDINARY_API_KEY) {
+          process.env.CLOUDINARY_API_KEY === 'your_api_key' ||
+          !process.env.CLOUDINARY_CLOUD_NAME ||
+          !process.env.CLOUDINARY_API_KEY) {
           console.warn('⚠️  Cloudinary has invalid/placeholder values, using MongoDB storage');
           useCloudinary = false;
         }
       }
-      
+
       if (useCloudinary) {
         console.log('Using Cloudinary for image storage');
         for (const file of req.files) {
@@ -92,12 +92,12 @@ exports.createReview = async (req, res, next) => {
               folder: 'fixmate/reviews',
               resource_type: 'auto'
             });
-            
+
             images.push({
               imageUrl: result.url,
               caption: ''
             });
-            
+
             console.log(`✅ Image uploaded to Cloudinary`);
             fs.unlinkSync(file.path);
           } catch (uploadError) {
@@ -124,12 +124,12 @@ exports.createReview = async (req, res, next) => {
           try {
             const buffer = fs.readFileSync(file.path);
             const base64Image = buffer.toString('base64');
-            
+
             images.push({
               imageUrl: `data:${file.mimetype};base64,${base64Image}`,
               caption: ''
             });
-            
+
             console.log(`✅ Image stored as base64`);
             fs.unlinkSync(file.path);
           } catch (error) {
@@ -188,7 +188,7 @@ exports.createReview = async (req, res, next) => {
     });
   } catch (error) {
     console.error('❌ Error creating review:', error);
-    
+
     // Send user-friendly error response
     return res.status(500).json({
       success: false,
@@ -229,15 +229,24 @@ exports.getBookingReview = async (req, res, next) => {
   }
 };
 
+// ============================================
+// REVIEW CONTROLLER - FIXED getWorkerReviews METHOD
+// Replace the getWorkerReviews function in your reviewController.js
+// ============================================
+
 /**
  * @desc    Get reviews for a worker
  * @route   GET /api/reviews/worker/:workerId
  * @access  Public
+ * 
+ * ✅ FIXED: Use 'new mongoose.Types.ObjectId()' instead of 'mongoose.Types.ObjectId()'
  */
 exports.getWorkerReviews = async (req, res, next) => {
   try {
     const { workerId } = req.params;
     const { page = 1, limit = 10, rating } = req.query;
+
+    console.log('📋 Fetching reviews for worker:', workerId);
 
     const query = {
       workerId,
@@ -256,12 +265,12 @@ exports.getWorkerReviews = async (req, res, next) => {
 
     const count = await Review.countDocuments(query);
 
-    // Get rating distribution
+    // ✅ FIXED: Get rating distribution with proper ObjectId usage
     const mongoose = require('mongoose');
     const ratingDistribution = await Review.aggregate([
       {
         $match: {
-          workerId: mongoose.Types.ObjectId(workerId),
+          workerId: new mongoose.Types.ObjectId(workerId),  // ✅ Added 'new' keyword
           isVisible: true,
           moderationStatus: 'approved'
         }
@@ -277,18 +286,29 @@ exports.getWorkerReviews = async (req, res, next) => {
       }
     ]);
 
+    // Calculate average rating from distribution
+    let averageRating = 0;
+    if (ratingDistribution.length > 0) {
+      const totalRatings = ratingDistribution.reduce((sum, item) => sum + item.count, 0);
+      const totalScore = ratingDistribution.reduce((sum, item) => sum + (item._id * item.count), 0);
+      averageRating = totalRatings > 0 ? (totalScore / totalRatings).toFixed(1) : 0;
+    }
+
+    console.log(`✅ Found ${reviews.length} reviews for worker ${workerId}`);
+
     res.status(200).json({
       success: true,
       data: {
         reviews,
         totalPages: Math.ceil(count / limit),
-        currentPage: page,
+        currentPage: parseInt(page),
         total: count,
+        averageRating: parseFloat(averageRating),
         ratingDistribution
       }
     });
   } catch (error) {
-    console.error('Error getting worker reviews:', error);
+    console.error('❌ Error getting worker reviews:', error);
     next(error);
   }
 };
@@ -362,7 +382,7 @@ exports.updateReview = async (req, res, next) => {
     if (req.files && req.files.length > 0) {
       const newImages = [];
       const useCloudinary = isCloudinaryConfigured();
-      
+
       for (const file of req.files) {
         try {
           if (useCloudinary) {
@@ -397,7 +417,7 @@ exports.updateReview = async (req, res, next) => {
       updateData,
       { new: true, runValidators: true }
     ).populate('customerId', 'fullName profileImage')
-     .populate('workerId', 'fullName profileImage');
+      .populate('workerId', 'fullName profileImage');
 
     res.status(200).json({
       success: true,
@@ -689,7 +709,7 @@ exports.rateCustomer = async (req, res, next) => {
     // Update customer's average rating
     const Customer = require('../models/Customer');
     const customer = await Customer.findOne({ userId: customerId });
-    
+
     if (customer) {
       const allCustomerRatings = await Review.find({
         customerId,
