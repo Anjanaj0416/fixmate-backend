@@ -363,9 +363,10 @@ workerSchema.index({ completedJobs: -1 });
 /**
  * Update worker's rating
  */
-workerSchema.methods.updateRating = async function(newRating) {
+workerSchema.methods.updateRating = async function (newRating) {
   const Review = require('./Review');
-  
+
+  // Get all approved and visible reviews for this worker
   const reviews = await Review.find({
     workerId: this.userId,
     isVisible: true,
@@ -373,9 +374,11 @@ workerSchema.methods.updateRating = async function(newRating) {
   });
 
   if (reviews.length === 0) {
+    // No reviews yet
     this.rating = 0;
     this.totalReviews = 0;
   } else {
+    // Calculate average rating
     const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
     this.rating = Math.round((totalRating / reviews.length) * 10) / 10;
     this.totalReviews = reviews.length;
@@ -387,15 +390,18 @@ workerSchema.methods.updateRating = async function(newRating) {
     });
   }
 
-  await this.save();
+  // ✅ FIX: Only validate the fields that were actually modified
+  // This prevents validation errors on required fields like experienceLevel and yearsOfExperience
+  // that weren't changed by this method
+  await this.save({ validateModifiedOnly: true });
 };
 
 /**
  * Update worker statistics
  */
-workerSchema.methods.updateStats = async function() {
+workerSchema.methods.updateStats = async function () {
   const Booking = require('./Booking');
-  
+
   const stats = await Booking.aggregate([
     { $match: { workerId: this.userId } },
     {
@@ -423,12 +429,12 @@ workerSchema.methods.updateStats = async function() {
 /**
  * Check if worker serves a specific location
  */
-workerSchema.methods.servesLocation = function(district, town = null) {
+workerSchema.methods.servesLocation = function (district, town = null) {
   const serviceArea = this.serviceAreas.find(area => area.district === district);
-  
+
   if (!serviceArea) return false;
   if (!town) return true;
-  
+
   return serviceArea.towns.length === 0 || serviceArea.towns.includes(town);
 };
 
@@ -437,7 +443,7 @@ workerSchema.methods.servesLocation = function(district, town = null) {
 // ==========================================
 
 // Update timestamp before save
-workerSchema.pre('save', function(next) {
+workerSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
