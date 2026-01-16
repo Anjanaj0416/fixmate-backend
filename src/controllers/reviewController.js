@@ -1,8 +1,11 @@
 const Review = require('../models/Review');
+const User = require('../models/User');
+const Worker = require('../models/Worker');
 const Booking = require('../models/Booking');
 const Notification = require('../models/Notification');
 const { uploadImage, isCloudinaryConfigured } = require('../config/cloudinary');
 const fs = require('fs');
+const mongoose = require('mongoose');
 
 /**
  * @desc    Create a review
@@ -228,18 +231,16 @@ exports.getBookingReview = async (req, res, next) => {
     next(error);
   }
 };
-
-// ============================================
-// REVIEW CONTROLLER - FIXED getWorkerReviews METHOD
-// Replace the getWorkerReviews function in your reviewController.js
-// ============================================
-
 /**
- * @desc    Get reviews for a worker
- * @route   GET /api/reviews/worker/:workerId
+ * ✅ FIXED - Get reviews for a worker
+ * @route   GET /api/v1/reviews/worker/:workerId
  * @access  Public
  * 
- * ✅ FIXED: Use 'new mongoose.Types.ObjectId()' instead of 'mongoose.Types.ObjectId()'
+ * FIXES:
+ * - Changed 'status' to 'moderationStatus' to match schema
+ * - Added proper ObjectId handling
+ * - Improved logging for debugging
+ * - Added image data validation
  */
 exports.getWorkerReviews = async (req, res, next) => {
   try {
@@ -247,30 +248,118 @@ exports.getWorkerReviews = async (req, res, next) => {
     const { page = 1, limit = 10, rating } = req.query;
 
     console.log('📋 Fetching reviews for worker:', workerId);
+    console.log('  Page:', page, '| Limit:', limit, '| Rating filter:', rating || 'none');
 
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(workerId)) {
+      console.log('❌ Invalid worker ID format');
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid worker ID format'
+      });
+    }
+
+    // ✅ FIX: Use correct field names matching Review schema
     const query = {
-      workerId,
+      workerId: new mongoose.Types.ObjectId(workerId),
       isVisible: true,
-      moderationStatus: 'approved'
+      moderationStatus: 'approved'  // ✅ FIXED: Changed from 'status'
     };
 
-    if (rating) query.rating = parseInt(rating);
+    if (rating) {
+      query.rating = parseInt(rating);
+    }
 
+    console.log('🔍 Query:', JSON.stringify(query, null, 2));
+
+    // ✅ FIX: Populate customer and booking data properly
     const reviews = await Review.find(query)
       .populate('customerId', 'fullName profileImage')
       .populate('bookingId', 'serviceType completedAt')
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();  // Use lean for better performance
+
+    console.log(`✅ Found ${reviews.length} reviews for worker ${workerId}`);
+
+    // Log detailed review information for debugging
+    if (reviews.length > 0) {
+      console.log('\n📊 Review Details:');
+      reviews.forEach((review, index) => {
+        console.log(`\n  Review #${index + 1}:`);
+        console.log(`    ID: ${review._id}`);
+        console.log(`    Rating: ${review.rating}/5`);
+        console.log(`    Customer: ${review.customerId?.fullName || 'Anonymous'}`);
+        console.log(`    Has comment: ${!!review.comment}`);
+        console.log(`    Would recommend: ${review.wouldRecommend ? 'Yes' : 'No'}`);
+        console.log(`    Created: ${review.createdAt}`);
+
+        // Log image details
+        if (review.images && review.images.length > 0) {
+          console.log(`    Images: ${review.images.length}`);
+          review.images.forEach((img, imgIndex) => {
+            console.log(`      Image ${imgIndex + 1}:`);
+            console.log(`        Has URL: ${!!img.imageUrl}`);
+            console.log(`        URL type: ${img.imageUrl?.startsWith('data:') ? 'Base64' : 'URL'}`);
+            console.log(`        URL length: ${img.imageUrl?.length || 0} chars`);
+            console.log(`        Has caption: ${!!img.caption}`);
+          });
+        } else {
+          console.log(`    Images: None`);
+        }
+
+        // Log detailed ratings if available
+        if (review.detailedRatings) {
+          console.log(`    Detailed ratings:`, review.detailedRatings);
+        }
+      });
+    } else {
+      console.log('\n⚠️ No reviews found. Running diagnostic...');
+
+      // Diagnostic: Check all reviews for this worker regardless of status
+      const allReviews = await Review.find({
+        workerId: new mongoose.Types.ObjectId(workerId)
+      }).lean();
+
+      console.log(`\n🔍 Diagnostic Results:`);
+      console.log(`  Total reviews in database: ${allReviews.length}`);
+
+      if (allReviews.length > 0) {
+        console.log(`\n  Review Status Breakdown:`);
+        allReviews.forEach((r, i) => {
+          console.log(`    Review ${i + 1}:`);
+          console.log(`      ID: ${r._id}`);
+          console.log(`      Moderation Status: ${r.moderationStatus}`);
+          console.log(`      Is Visible: ${r.isVisible}`);
+          console.log(`      Rating: ${r.rating}`);
+          console.log(`      Has Images: ${r.images?.length > 0}`);
+        });
+
+        // Check if there are reviews that need approval
+        const pendingCount = allReviews.filter(r => r.moderationStatus === 'pending').length;
+        const rejectedCount = allReviews.filter(r => r.moderationStatus === 'rejected').length;
+        const hiddenCount = allReviews.filter(r => !r.isVisible).length;
+
+        if (pendingCount > 0) {
+          console.log(`\n  ⏳ ${pendingCount} review(s) pending approval`);
+        }
+        if (rejectedCount > 0) {
+          console.log(`  ❌ ${rejectedCount} review(s) rejected`);
+        }
+        if (hiddenCount > 0) {
+          console.log(`  👁️ ${hiddenCount} review(s) hidden`);
+        }
+      }
+    }
 
     const count = await Review.countDocuments(query);
 
-    // ✅ FIXED: Get rating distribution with proper ObjectId usage
-    const mongoose = require('mongoose');
+    // Get rating distribution using aggregation
     const ratingDistribution = await Review.aggregate([
       {
         $match: {
-          workerId: new mongoose.Types.ObjectId(workerId),  // ✅ Added 'new' keyword
+          workerId: new mongoose.Types.ObjectId(workerId),
           isVisible: true,
           moderationStatus: 'approved'
         }
@@ -286,7 +375,9 @@ exports.getWorkerReviews = async (req, res, next) => {
       }
     ]);
 
-    // Calculate average rating from distribution
+    console.log('\n📈 Rating Distribution:', ratingDistribution);
+
+    // Calculate average rating
     let averageRating = 0;
     if (ratingDistribution.length > 0) {
       const totalRatings = ratingDistribution.reduce((sum, item) => sum + item.count, 0);
@@ -294,7 +385,7 @@ exports.getWorkerReviews = async (req, res, next) => {
       averageRating = totalRatings > 0 ? (totalScore / totalRatings).toFixed(1) : 0;
     }
 
-    console.log(`✅ Found ${reviews.length} reviews for worker ${workerId}`);
+    console.log(`⭐ Average Rating: ${averageRating}\n`);
 
     res.status(200).json({
       success: true,
@@ -304,11 +395,157 @@ exports.getWorkerReviews = async (req, res, next) => {
         currentPage: parseInt(page),
         total: count,
         averageRating: parseFloat(averageRating),
-        ratingDistribution
+        ratingDistribution: ratingDistribution
       }
     });
   } catch (error) {
-    console.error('❌ Error getting worker reviews:', error);
+    console.error('❌ Error fetching worker reviews:', error);
+    console.error('Stack trace:', error.stack);
+    next(error);
+  }
+};
+
+/**
+ * ✅ Database Diagnostic Tool
+ * Call this to check review data integrity
+ */
+exports.diagnoseReviewData = async (req, res, next) => {
+  try {
+    const { workerId } = req.params;
+
+    console.log('\n🔍 RUNNING REVIEW DIAGNOSTIC FOR WORKER:', workerId);
+    console.log('='.repeat(60));
+
+    // Check if worker exists
+    const worker = await Worker.findById(workerId).populate('userId');
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker not found'
+      });
+    }
+
+    console.log('\n✅ Worker Found:');
+    console.log('  Name:', worker.userId?.fullName);
+    console.log('  Worker Rating:', worker.rating);
+    console.log('  Worker Review Count:', worker.reviewCount || 0);
+
+    // Get all reviews for this worker
+    const allReviews = await Review.find({ workerId: new mongoose.Types.ObjectId(workerId) })
+      .populate('customerId', 'fullName')
+      .populate('bookingId', 'serviceType')
+      .lean();
+
+    console.log('\n📊 Review Analysis:');
+    console.log('  Total Reviews:', allReviews.length);
+
+    if (allReviews.length === 0) {
+      console.log('\n⚠️ No reviews found for this worker');
+      return res.status(200).json({
+        success: true,
+        message: 'No reviews found',
+        data: { worker, reviews: [] }
+      });
+    }
+
+    // Analyze review statuses
+    const statusCounts = {
+      approved: 0,
+      pending: 0,
+      rejected: 0,
+      flagged: 0
+    };
+
+    const visibleCounts = {
+      visible: 0,
+      hidden: 0
+    };
+
+    const imageCounts = {
+      withImages: 0,
+      withoutImages: 0,
+      totalImages: 0
+    };
+
+    allReviews.forEach(review => {
+      // Status
+      statusCounts[review.moderationStatus] = (statusCounts[review.moderationStatus] || 0) + 1;
+
+      // Visibility
+      if (review.isVisible) {
+        visibleCounts.visible++;
+      } else {
+        visibleCounts.hidden++;
+      }
+
+      // Images
+      if (review.images && review.images.length > 0) {
+        imageCounts.withImages++;
+        imageCounts.totalImages += review.images.length;
+      } else {
+        imageCounts.withoutImages++;
+      }
+    });
+
+    console.log('\n  Status Breakdown:');
+    Object.entries(statusCounts).forEach(([status, count]) => {
+      if (count > 0) console.log(`    ${status}: ${count}`);
+    });
+
+    console.log('\n  Visibility:');
+    console.log(`    Visible: ${visibleCounts.visible}`);
+    console.log(`    Hidden: ${visibleCounts.hidden}`);
+
+    console.log('\n  Images:');
+    console.log(`    Reviews with images: ${imageCounts.withImages}`);
+    console.log(`    Reviews without images: ${imageCounts.withoutImages}`);
+    console.log(`    Total images: ${imageCounts.totalImages}`);
+
+    // Show sample reviews
+    console.log('\n📝 Sample Reviews:');
+    allReviews.slice(0, 3).forEach((review, index) => {
+      console.log(`\n  Review ${index + 1}:`);
+      console.log(`    ID: ${review._id}`);
+      console.log(`    Customer: ${review.customerId?.fullName || 'Anonymous'}`);
+      console.log(`    Rating: ${review.rating}/5`);
+      console.log(`    Status: ${review.moderationStatus}`);
+      console.log(`    Visible: ${review.isVisible}`);
+      console.log(`    Has comment: ${!!review.comment}`);
+      console.log(`    Images: ${review.images?.length || 0}`);
+      console.log(`    Created: ${review.createdAt}`);
+    });
+
+    console.log('\n' + '='.repeat(60));
+    console.log('✅ DIAGNOSTIC COMPLETE\n');
+
+    res.status(200).json({
+      success: true,
+      data: {
+        worker: {
+          id: worker._id,
+          name: worker.userId?.fullName,
+          rating: worker.rating,
+          reviewCount: worker.reviewCount || 0
+        },
+        analysis: {
+          totalReviews: allReviews.length,
+          statusCounts,
+          visibleCounts,
+          imageCounts
+        },
+        sampleReviews: allReviews.slice(0, 5).map(r => ({
+          id: r._id,
+          rating: r.rating,
+          status: r.moderationStatus,
+          visible: r.isVisible,
+          hasImages: r.images?.length > 0,
+          imageCount: r.images?.length || 0
+        }))
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Diagnostic error:', error);
     next(error);
   }
 };

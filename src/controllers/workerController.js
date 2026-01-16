@@ -1,5 +1,5 @@
 const { Worker, User, Review, Booking } = require('../models');
-
+const mongoose = require('mongoose');
 
 
 /**
@@ -446,54 +446,7 @@ exports.getWorkerStats = async (req, res, next) => {
 
 
 
-/**
- * @desc    Get worker reviews
- * @route   GET /api/workers/:id/reviews
- * @access  Public
- */
-exports.getWorkerReviews = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { page = 1, limit = 10 } = req.query;
 
-    const worker = await Worker.findById(id);
-    if (!worker) {
-      return res.status(404).json({
-        success: false,
-        message: 'Worker not found'
-      });
-    }
-
-    const reviews = await Review.find({
-      workerId: worker.userId,
-      isVisible: true,
-      moderationStatus: 'approved'
-    })
-      .populate('customerId', 'fullName profileImage')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
-
-    const count = await Review.countDocuments({
-      workerId: worker.userId,
-      isVisible: true,
-      moderationStatus: 'approved'
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        reviews,
-        totalPages: Math.ceil(count / limit),
-        currentPage: page,
-        total: count,
-        averageRating: worker.rating.average
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
 /**
  * @desc    Add certification
@@ -833,68 +786,7 @@ exports.getWorkerOwnProfile = async (req, res, next) => {
   }
 };
 
-/**
- * Get worker profile by ID (for customers to view)
- * @desc    Get detailed worker profile including reviews
- * @route   GET /api/v1/workers/:id/profile
- * @access  Public
- */
-exports.getWorkerProfileById = async (req, res, next) => {
-  try {
-    const { id } = req.params;
 
-    console.log('📋 Fetching worker profile by ID:', id);
-
-    // Find worker with populated data
-    const worker = await Worker.findById(id)
-      .populate('userId', 'fullName email phoneNumber profileImage createdAt')
-      .lean();
-
-    if (!worker) {
-      return res.status(404).json({
-        success: false,
-        message: 'Worker not found'
-      });
-    }
-
-    // Get worker's reviews
-    const reviews = await Review.find({
-      workerId: id,
-      status: 'approved'
-    })
-      .populate('customerId', 'fullName profileImage')
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean();
-
-    // Get completed bookings count
-    const completedBookings = await Booking.countDocuments({
-      workerId: id,
-      status: 'completed'
-    });
-
-    // Compile profile data
-    const profileData = {
-      ...worker,
-      memberSince: worker.userId?.createdAt
-    };
-
-    console.log('✅ Worker profile fetched successfully');
-
-    res.status(200).json({
-      success: true,
-      data: {
-        worker: profileData,
-        reviews: reviews,
-        completedJobs: completedBookings
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error fetching worker profile:', error);
-    next(error);
-  }
-};
 /**
  * ✅ NEW - Get worker dashboard data
  * @desc    Get worker dashboard data with stats and recent bookings
@@ -1035,3 +927,264 @@ function calculateProfileCompletion(worker) {
 
   return Math.round((completedFields / totalFields) * 100);
 }
+
+/**
+ * ✅ FIXED - Get worker profile by ID (for customers to view)
+ * @desc    Get detailed worker profile including reviews with images
+ * @route   GET /api/v1/workers/:id/profile
+ * @access  Public
+ */
+exports.getWorkerProfileById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    console.log('📋 Fetching worker profile by ID:', id);
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid worker ID format'
+      });
+    }
+
+    // Find worker with populated data
+    const worker = await Worker.findById(id)
+      .populate('userId', 'fullName email phoneNumber profileImage createdAt')
+      .lean();
+
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker not found'
+      });
+    }
+
+    console.log('✅ Worker found:', worker.userId?.fullName);
+
+    // ✅ FIX: Get worker's reviews with CORRECT field name
+    // Changed from 'status' to 'moderationStatus' to match Review schema
+    const reviews = await Review.find({
+      workerId: new mongoose.Types.ObjectId(id),  // Ensure proper ObjectId
+      moderationStatus: 'approved',  // ✅ FIXED: Changed from 'status'
+      isVisible: true
+    })
+      .populate('customerId', 'fullName profileImage')
+      .populate('bookingId', 'serviceType completedAt')
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    console.log(`📊 Found ${reviews.length} approved reviews for worker ${id}`);
+    
+    // Log detailed review data for debugging
+    if (reviews.length > 0) {
+      reviews.forEach((review, index) => {
+        console.log(`  Review ${index + 1}:`, {
+          id: review._id,
+          rating: review.rating,
+          customerName: review.customerId?.fullName || 'Anonymous',
+          hasComment: !!review.comment,
+          hasImages: review.images?.length > 0,
+          imageCount: review.images?.length || 0,
+          wouldRecommend: review.wouldRecommend,
+          createdAt: review.createdAt
+        });
+
+        // Log image details if present
+        if (review.images && review.images.length > 0) {
+          review.images.forEach((img, imgIndex) => {
+            console.log(`    Image ${imgIndex + 1}:`, {
+              hasUrl: !!img.imageUrl,
+              urlLength: img.imageUrl?.length || 0,
+              hasCaption: !!img.caption,
+              isBase64: img.imageUrl?.startsWith('data:') || false
+            });
+          });
+        }
+      });
+    } else {
+      console.log('⚠️ No reviews found. Checking database...');
+      
+      // Debug: Check if any reviews exist for this worker with any status
+      const allReviews = await Review.find({ workerId: new mongoose.Types.ObjectId(id) }).lean();
+      console.log(`  Total reviews in DB for this worker: ${allReviews.length}`);
+      
+      if (allReviews.length > 0) {
+        console.log('  Review statuses:', allReviews.map(r => ({
+          id: r._id,
+          moderationStatus: r.moderationStatus,
+          isVisible: r.isVisible,
+          rating: r.rating
+        })));
+      }
+    }
+
+    // Get completed bookings count
+    const completedBookings = await Booking.countDocuments({
+      workerId: new mongoose.Types.ObjectId(id),
+      status: 'completed'
+    });
+
+    console.log(`📦 Completed bookings: ${completedBookings}`);
+
+    // Calculate rating statistics from reviews
+    const ratingStats = await Review.aggregate([
+      {
+        $match: {
+          workerId: new mongoose.Types.ObjectId(id),
+          moderationStatus: 'approved',
+          isVisible: true
+        }
+      },
+      {
+        $group: {
+          _id: '$rating',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { _id: -1 }
+      }
+    ]);
+
+    console.log('📈 Rating distribution:', ratingStats);
+
+    // Calculate average rating and total
+    let averageRating = 0;
+    let totalReviews = 0;
+    if (ratingStats.length > 0) {
+      totalReviews = ratingStats.reduce((sum, item) => sum + item.count, 0);
+      const totalScore = ratingStats.reduce((sum, item) => sum + (item._id * item.count), 0);
+      averageRating = totalReviews > 0 ? (totalScore / totalReviews).toFixed(1) : 0;
+    }
+
+    console.log(`⭐ Average rating: ${averageRating} (${totalReviews} reviews)`);
+
+    // Compile profile data with review statistics
+    const profileData = {
+      ...worker,
+      memberSince: worker.userId?.createdAt,
+      reviewStats: {
+        average: parseFloat(averageRating),
+        total: totalReviews,
+        distribution: ratingStats
+      }
+    };
+
+    console.log('✅ Worker profile compiled successfully');
+
+    res.status(200).json({
+      success: true,
+      data: {
+        worker: profileData,
+        reviews: reviews,
+        completedJobs: completedBookings
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching worker profile:', error);
+    next(error);
+  }
+};
+
+/**
+ * ✅ FIXED - Get worker reviews (alternative endpoint)
+ * @desc    Get worker reviews with pagination
+ * @route   GET /api/v1/workers/:id/reviews
+ * @access  Public
+ */
+exports.getWorkerReviews = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 10, rating } = req.query;
+
+    console.log('📋 Fetching paginated reviews for worker:', id);
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid worker ID format'
+      });
+    }
+
+    const worker = await Worker.findById(id);
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker not found'
+      });
+    }
+
+    // Build query with CORRECT field names
+    const query = {
+      workerId: new mongoose.Types.ObjectId(id),
+      isVisible: true,
+      moderationStatus: 'approved'  // ✅ FIXED: Changed from 'status'
+    };
+
+    if (rating) {
+      query.rating = parseInt(rating);
+      console.log(`  Filtering by rating: ${rating}`);
+    }
+
+    // Get reviews with pagination
+    const reviews = await Review.find(query)
+      .populate('customerId', 'fullName profileImage')
+      .populate('bookingId', 'serviceType completedAt')
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const count = await Review.countDocuments(query);
+
+    console.log(`✅ Found ${reviews.length} reviews (page ${page} of ${Math.ceil(count / limit)})`);
+
+    // Calculate rating distribution
+    const ratingDistribution = await Review.aggregate([
+      {
+        $match: {
+          workerId: new mongoose.Types.ObjectId(id),
+          isVisible: true,
+          moderationStatus: 'approved'
+        }
+      },
+      {
+        $group: {
+          _id: '$rating',
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { _id: -1 }
+      }
+    ]);
+
+    // Calculate average rating
+    let averageRating = 0;
+    if (ratingDistribution.length > 0) {
+      const totalRatings = ratingDistribution.reduce((sum, item) => sum + item.count, 0);
+      const totalScore = ratingDistribution.reduce((sum, item) => sum + (item._id * item.count), 0);
+      averageRating = totalRatings > 0 ? (totalScore / totalRatings).toFixed(1) : 0;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        reviews,
+        totalPages: Math.ceil(count / limit),
+        currentPage: parseInt(page),
+        total: count,
+        averageRating: parseFloat(averageRating),
+        ratingDistribution: ratingDistribution
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching worker reviews:', error);
+    next(error);
+  }
+};
+
+module.exports = exports;
