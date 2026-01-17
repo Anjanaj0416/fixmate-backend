@@ -3,7 +3,7 @@ const Worker = require('../models/Worker');
 const Customer = require('../models/Customer');
 const Booking = require('../models/Booking');
 const Review = require('../models/Review');
-const Payment = require('../models/Payment');
+
 const logger = require('../utils/logger');
 
 /**

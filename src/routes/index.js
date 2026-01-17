@@ -14,9 +14,9 @@ const bookingRoutes = require('./bookingRoutes');
 const reviewRoutes = require('./reviewRoutes');
 const chatRoutes = require('./chatRoutes');
 const notificationRoutes = require('./notificationRoutes');
-const paymentRoutes = require('./paymentRoutes');
+
 const adminRoutes = require('./adminRoutes');
-const aiRoutes = require('./aiRoutes');
+
 
 /**
  * API Welcome Route
@@ -34,9 +34,9 @@ router.get('/', (req, res) => {
       reviews: '/reviews',
       chat: '/chat',
       notifications: '/notifications',
-      payments: '/payments',
+      
       admin: '/admin',
-      ai: '/ai'
+      
     },
     documentation: '/docs',
     status: 'active'
@@ -53,9 +53,9 @@ router.use('/bookings', bookingRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/chat', chatRoutes);
 router.use('/notifications', notificationRoutes);
-router.use('/payments', paymentRoutes);
+
 router.use('/admin', adminRoutes);
-router.use('/ai', aiRoutes);
+
 
 /**
  * API Documentation Route (placeholder)

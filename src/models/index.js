@@ -11,7 +11,7 @@ const Review = require('./Review');
 const Message = require('./Message');
 const Conversation = require('./Conversation');
 const Notification = require('./Notification');
-const Payment = require('./Payment');
+
 const Quote = require('./Quote');
 const Category = require('./Category');
 const ProblemImage = require('./ProblemImage');
@@ -25,7 +25,6 @@ module.exports = {
   Message,
   Conversation,
   Notification,
-  Payment,
   Quote,
   Category,
   ProblemImage

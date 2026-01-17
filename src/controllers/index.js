@@ -6,9 +6,9 @@ const bookingController = require('./bookingController');
 const reviewController = require('./reviewController');
 const chatController = require('./chatController');
 const notificationController = require('./notificationController');
-const paymentController = require('./paymentController');
+
 const adminController = require('./adminController');
-const aiController = require('./aiController');
+
 
 module.exports = {
   authController,
@@ -18,7 +18,7 @@ module.exports = {
   reviewController,
   chatController,
   notificationController,
-  paymentController,
-  adminController,
-  aiController
+  
+  adminController
+  
 };

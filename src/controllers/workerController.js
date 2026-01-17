@@ -366,13 +366,137 @@ exports.updateAvailability = async (req, res, next) => {
 };
 
 /**
+ * @desc    Get worker dashboard
+ * @route   GET /api/workers/dashboard
+ * @access  Private/Worker
+ * 
+ * ✅ FIXED: Removed Payment model, using Booking.finalPrice instead
+ */
+exports.getDashboard = async (req, res, next) => {
+  try {
+    const { firebaseUid } = req.user;
+
+    console.log('📊 WorkerController - getDashboard called for:', firebaseUid);
+
+    // Get user
+    const User = require('../models/User');
+    const user = await User.findOne({ firebaseUid });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Find worker profile
+    const Worker = require('../models/Worker');
+    const worker = await Worker.findOne({ userId: user._id });
+    if (!worker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Worker profile not found'
+      });
+    }
+
+    console.log('👷 Worker found:', worker._id);
+
+    // Get booking statistics
+    const Booking = require('../models/Booking');
+    const pendingRequestsCount = await Booking.countDocuments({
+      sentToWorkers: worker._id,
+      status: { $in: ['quote_requested', 'pending'] }
+    });
+
+    const activeJobsCount = await Booking.countDocuments({
+      workerId: user._id,
+      status: { $in: ['accepted', 'in-progress'] }
+    });
+
+    const completedJobsCount = await Booking.countDocuments({
+      workerId: user._id,
+      status: 'completed'
+    });
+
+    // ✅ FIXED: Calculate total earnings from Booking.finalPrice instead of Payment model
+    const earningsResult = await Booking.aggregate([
+      {
+        $match: {
+          workerId: user._id,
+          status: 'completed',
+          paymentStatus: 'paid',
+          finalPrice: { $exists: true, $ne: null }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: '$finalPrice' }
+        }
+      }
+    ]);
+
+    const totalEarnings = earningsResult[0]?.totalEarnings || 0;
+
+    const stats = {
+      pendingRequests: pendingRequestsCount,
+      activeJobs: activeJobsCount,
+      completedJobs: completedJobsCount,
+      totalEarnings: totalEarnings
+    };
+
+    console.log('📈 Stats calculated:', stats);
+
+    // Get recent bookings (both pending requests and accepted jobs)
+    const recentBookings = await Booking.find({
+      $or: [
+        { sentToWorkers: worker._id, status: { $in: ['quote_requested', 'pending'] } },
+        { workerId: user._id }
+      ]
+    })
+      .populate('customerId', 'fullName profileImage phoneNumber email')
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    console.log(`📋 Found ${recentBookings.length} recent bookings`);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        stats,
+        recentBookings,
+        worker: {
+          _id: worker._id,
+          rating: worker.rating,
+          totalReviews: worker.totalReviews,
+          availability: worker.availability,
+          isVerified: worker.isVerified
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error in getDashboard:', error);
+    next(error);
+  }
+};
+
+// ============================================
+// PATCH 2: getWorkerStats Function
+// ============================================
+
+/**
  * @desc    Get worker statistics
  * @route   GET /api/workers/stats
  * @access  Private/Worker
+ * 
+ * ✅ FIXED: Removed Payment model, using Booking.finalPrice instead
  */
 exports.getWorkerStats = async (req, res, next) => {
   try {
     const { firebaseUid } = req.user;
+    const User = require('../models/User');
+    const Worker = require('../models/Worker');
+    const Booking = require('../models/Booking');
+
     const user = await User.findOne({ firebaseUid });
     const worker = await Worker.findOne({ userId: user._id });
 
@@ -394,35 +518,54 @@ exports.getWorkerStats = async (req, res, next) => {
       status: { $in: ['accepted', 'in-progress'] }
     });
 
-    // Get earnings this month
+    // ✅ FIXED: Get earnings this month from Booking.finalPrice instead of Payment model
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const Payment = require('../models/Payment');
-    const monthlyEarnings = await Payment.aggregate([
+    const monthlyEarningsResult = await Booking.aggregate([
       {
         $match: {
           workerId: user._id,
           status: 'completed',
+          paymentStatus: 'paid',
+          finalPrice: { $exists: true, $ne: null },
           completedAt: { $gte: startOfMonth }
         }
       },
       {
         $group: {
           _id: null,
-          total: { $sum: '$workerEarnings' }
+          total: { $sum: '$finalPrice' }
+        }
+      }
+    ]);
+
+    // ✅ FIXED: Get all-time earnings from Booking.finalPrice
+    const allTimeEarningsResult = await Booking.aggregate([
+      {
+        $match: {
+          workerId: user._id,
+          status: 'completed',
+          paymentStatus: 'paid',
+          finalPrice: { $exists: true, $ne: null }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$finalPrice' }
         }
       }
     ]);
 
     const stats = {
       profile: {
-        rating: worker.rating,
-        completedJobs: worker.completedJobs,
-        totalEarnings: worker.totalEarnings,
-        acceptanceRate: worker.acceptanceRate,
-        responseTime: worker.responseTime
+        rating: worker.rating || 0,
+        completedJobs: worker.completedJobs || 0,
+        totalEarnings: allTimeEarningsResult[0]?.total || 0,
+        acceptanceRate: worker.acceptanceRate || 0,
+        responseTime: worker.responseTime || 0
       },
       bookings: {
         total: totalBookings,
@@ -430,8 +573,8 @@ exports.getWorkerStats = async (req, res, next) => {
         active: activeBookings
       },
       earnings: {
-        thisMonth: monthlyEarnings[0]?.total || 0,
-        allTime: worker.totalEarnings
+        thisMonth: monthlyEarningsResult[0]?.total || 0,
+        allTime: allTimeEarningsResult[0]?.total || 0
       }
     };
 
@@ -440,11 +583,10 @@ exports.getWorkerStats = async (req, res, next) => {
       data: { stats }
     });
   } catch (error) {
+    console.error('Error in getWorkerStats:', error);
     next(error);
   }
 };
-
-
 
 
 
@@ -787,124 +929,7 @@ exports.getWorkerOwnProfile = async (req, res, next) => {
 };
 
 
-/**
- * ✅ NEW - Get worker dashboard data
- * @desc    Get worker dashboard data with stats and recent bookings
- * @route   GET /workers/dashboard
- * @access  Private/Worker
- */
-exports.getDashboard = async (req, res, next) => {
-  try {
-    const { firebaseUid } = req.user;
 
-    console.log('📊 Fetching dashboard for worker:', firebaseUid);
-
-    // Find user
-    const user = await User.findOne({ firebaseUid });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    // Find worker profile
-    const worker = await Worker.findOne({ userId: user._id });
-    if (!worker) {
-      return res.status(404).json({
-        success: false,
-        message: 'Worker profile not found'
-      });
-    }
-
-    console.log('👷 Worker found:', worker._id);
-
-    // Get booking statistics
-    const pendingRequestsCount = await Booking.countDocuments({
-      sentToWorkers: worker._id,
-      status: { $in: ['quote_requested', 'pending'] }
-    });
-
-    const activeJobsCount = await Booking.countDocuments({
-      workerId: user._id,
-      status: { $in: ['accepted', 'in-progress'] }
-    });
-
-    const completedJobsCount = await Booking.countDocuments({
-      workerId: user._id,
-      status: 'completed'
-    });
-
-    // Calculate total earnings (if Payment model exists)
-    let totalEarnings = 0;
-    try {
-      const Payment = require('../models/Payment');
-      const payments = await Payment.find({
-        workerId: user._id,
-        status: 'completed'
-      });
-      totalEarnings = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    } catch (err) {
-      console.log('ℹ️  Payment model not available, skipping earnings calculation');
-    }
-
-    const stats = {
-      pendingRequests: pendingRequestsCount,
-      activeJobs: activeJobsCount,
-      completedJobs: completedJobsCount,
-      totalEarnings: totalEarnings
-    };
-
-    console.log('📈 Stats calculated:', stats);
-
-    // Get recent bookings (both pending requests and accepted jobs)
-    const recentBookings = await Booking.find({
-      $or: [
-        { sentToWorkers: worker._id, status: { $in: ['quote_requested', 'pending'] } },
-        { workerId: user._id }
-      ]
-    })
-      .populate('customerId', 'fullName profileImage phoneNumber email')
-      .sort({ createdAt: -1 })
-      .limit(10);
-
-    console.log('📋 Found', recentBookings.length, 'recent bookings');
-
-    // Calculate profile completion percentage
-    const profileCompletion = calculateProfileCompletion(worker);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        stats,
-        recentBookings,
-        worker: {
-          id: worker._id,
-          userId: user._id,
-          fullName: user.fullName,
-          email: user.email,
-          phoneNumber: user.phoneNumber,
-          profileImage: user.profileImage,
-          completionRate: worker.completionRate || 0,
-          rating: worker.rating || 0,
-          totalReviews: worker.totalReviews || 0,
-          isVerified: worker.isVerified || false,
-          availability: worker.availability || true,
-          profileCompletion: profileCompletion,
-          serviceCategories: worker.serviceCategories || [],
-          bio: worker.bio || '',
-          experience: worker.experience || ''
-        }
-      }
-    });
-
-    console.log('✅ Dashboard data sent successfully');
-
-  } catch (error) {
-    console.error('❌ Error fetching dashboard:', error);
-    next(error);
-  }
-};
 
 /**
  * Helper function to calculate profile completion percentage
@@ -975,7 +1000,7 @@ exports.getWorkerProfileById = async (req, res, next) => {
       .lean();
 
     console.log(`📊 Found ${reviews.length} approved reviews for worker ${id}`);
-    
+
     // Log detailed review data for debugging
     if (reviews.length > 0) {
       reviews.forEach((review, index) => {
@@ -1004,11 +1029,11 @@ exports.getWorkerProfileById = async (req, res, next) => {
       });
     } else {
       console.log('⚠️ No reviews found. Checking database...');
-      
+
       // Debug: Check if any reviews exist for this worker with any status
       const allReviews = await Review.find({ workerId: new mongoose.Types.ObjectId(id) }).lean();
       console.log(`  Total reviews in DB for this worker: ${allReviews.length}`);
-      
+
       if (allReviews.length > 0) {
         console.log('  Review statuses:', allReviews.map(r => ({
           id: r._id,

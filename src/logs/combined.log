@@ -7248,3 +7248,77 @@
 {"level":"info","message":"📨 POST /auth/verify-token (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 20:16:30"}
 {"level":"info","message":"📨 GET /workers/profile (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 20:16:30"}
 {"level":"info","message":"📨 GET /workers/dashboard (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 20:16:31"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 20:46:03"}
+{"level":"info","message":"📨 GET /bookings (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 20:46:08"}
+{"level":"info","message":"Mongoose default connection is disconnected","service":"fixmate-api","timestamp":"2026-01-16 20:46:11"}
+{"level":"warn","message":"Mongoose disconnected from MongoDB","service":"fixmate-api","timestamp":"2026-01-16 20:46:11"}
+{"level":"info","message":"Mongoose default connection is open","service":"fixmate-api","timestamp":"2026-01-16 20:46:11"}
+{"level":"info","message":"Mongoose connected to MongoDB","service":"fixmate-api","timestamp":"2026-01-16 20:46:11"}
+{"level":"info","message":"📨 GET /workers/profile (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 20:50:12"}
+{"level":"info","message":"📨 GET /workers/dashboard (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 20:50:12"}
+{"level":"info","message":"📨 POST /auth/verify-token (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 22:04:36"}
+{"level":"info","message":"📨 GET /notifications (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 22:04:36"}
+{"level":"info","message":"📨 POST /auth/verify-token (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 22:04:36"}
+{"level":"info","message":"📨 POST /auth/login (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 22:04:46"}
+{"level":"info","message":"📨 GET /notifications (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 22:04:46"}
+{"level":"info","message":"📨 GET /bookings/stats (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 22:04:46"}
+{"level":"info","message":"📨 GET /bookings/stats (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 22:04:47"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 22:04:49"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 22:04:51"}
+{"level":"info","message":"📨 GET /bookings/stats (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 22:04:54"}
+{"level":"info","message":"📨 GET /bookings/stats (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-16 22:04:54"}
+{"level":"info","message":"Starting FixMate Backend Server...","service":"fixmate-api","timestamp":"2026-01-17 12:44:52"}
+{"level":"info","message":"Environment: development","service":"fixmate-api","timestamp":"2026-01-17 12:44:52"}
+{"level":"info","message":"Connecting to MongoDB...","service":"fixmate-api","timestamp":"2026-01-17 12:44:52"}
+{"level":"info","message":"Mongoose default connection is open","service":"fixmate-api","timestamp":"2026-01-17 12:44:53"}
+{"level":"info","message":"MongoDB Connected: ac-xisigml-shard-00-00.5aysnp1.mongodb.net","service":"fixmate-api","timestamp":"2026-01-17 12:44:53"}
+{"level":"info","message":"Database Name: test","service":"fixmate-api","timestamp":"2026-01-17 12:44:53"}
+{"level":"info","message":"✅ MongoDB connected successfully","service":"fixmate-api","timestamp":"2026-01-17 12:44:53"}
+{"level":"info","message":"Initializing Firebase Admin SDK...","service":"fixmate-api","timestamp":"2026-01-17 12:44:53"}
+{"level":"info","message":"Firebase Admin SDK initialized successfully","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"Project ID: fixamte-df879","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"✅ Firebase Admin SDK initialized successfully","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"Checking Cloudinary configuration...","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"Cloudinary initialized successfully","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"Cloud Name: your_cloud_name","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"✅ Cloudinary initialized successfully","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"All services initialized successfully","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"==================================================","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"🚀 FixMate Server running in development mode","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"📡 Server listening on port 5001","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"🌐 API URL: http://localhost:5001","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"💚 Health check: http://localhost:5001/health","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"==================================================","service":"fixmate-api","timestamp":"2026-01-17 12:44:55"}
+{"level":"info","message":"Starting FixMate Backend Server...","service":"fixmate-api","timestamp":"2026-01-17 12:45:41"}
+{"level":"info","message":"Environment: development","service":"fixmate-api","timestamp":"2026-01-17 12:45:41"}
+{"level":"info","message":"Connecting to MongoDB...","service":"fixmate-api","timestamp":"2026-01-17 12:45:41"}
+{"level":"info","message":"Mongoose default connection is open","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"MongoDB Connected: ac-xisigml-shard-00-01.5aysnp1.mongodb.net","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"Database Name: test","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"✅ MongoDB connected successfully","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"Initializing Firebase Admin SDK...","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"Firebase Admin SDK initialized successfully","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"Project ID: fixamte-df879","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"✅ Firebase Admin SDK initialized successfully","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"Checking Cloudinary configuration...","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"Cloudinary initialized successfully","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"Cloud Name: your_cloud_name","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"✅ Cloudinary initialized successfully","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"All services initialized successfully","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"==================================================","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"🚀 FixMate Server running in development mode","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"📡 Server listening on port 5001","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"🌐 API URL: http://localhost:5001","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"💚 Health check: http://localhost:5001/health","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"==================================================","service":"fixmate-api","timestamp":"2026-01-17 12:45:42"}
+{"level":"info","message":"📨 POST /auth/verify-token (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-17 12:46:06"}
+{"level":"info","message":"📨 GET /notifications (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-17 12:46:06"}
+{"level":"info","message":"📨 POST /auth/verify-token (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-17 12:46:06"}
+{"level":"info","message":"📨 POST /auth/login (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-17 12:46:27"}
+{"level":"info","message":"📨 GET /notifications (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-17 12:46:28"}
+{"level":"info","message":"📨 GET /bookings/stats (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-17 12:46:32"}
+{"level":"info","message":"📨 GET /bookings/stats (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-17 12:46:32"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-17 12:46:33"}
+{"level":"info","message":"📨 GET /bookings/my (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-17 12:46:34"}
+{"level":"info","message":"📨 GET /bookings/stats (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-17 12:46:38"}
+{"level":"info","message":"📨 GET /bookings/stats (Origin: http://localhost:5173)","service":"fixmate-api","timestamp":"2026-01-17 12:46:38"}
